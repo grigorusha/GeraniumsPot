@@ -24,7 +24,7 @@ PARTS_COLOR =    [(255, 255, 255, 255), (30, 30, 30, 255), (200, 200, 200, 255),
 WIN_WIDTH, WIN_HEIGHT = 470, 300
 PANEL = 33 * 3
 BORDER = 20
-COUNTUR = 10
+COUNTUR = 4
 GAME = (WIN_WIDTH, WIN_HEIGHT)
 
 dirname = filename = ""
@@ -55,7 +55,11 @@ def button_init(screen, font_button, WIN_HEIGHT):
                          inactiveColour=GREEN_COLOR, hoverColour=GREEN_COLOR, pressedColour=(0, 200, 20),
                          onClick=lambda: button_Button_click("undo"))
 
-    button_Info = Button(screen, button_Undo.textRect.right + 20, button_y1, 100, 20, text='Puzzle Photo ->',
+    button_Photo = Button(screen, button_Undo.textRect.right + 20, button_y1, 60, 20, text='Photo ->',
+                         fontSize=20, font=font_button, margin=5, radius=3,
+                         inactiveColour=BLUE_COLOR, hoverColour=BLUE_COLOR, pressedColour=(0, 200, 20),
+                         onClick=lambda: button_Button_click("photo"))
+    button_Info = Button(screen, button_Photo.textRect.right + 10, button_y1, 48, 20, text='Info ->',
                          fontSize=20, font=font_button, margin=5, radius=3,
                          inactiveColour=BLUE_COLOR, hoverColour=BLUE_COLOR, pressedColour=(0, 200, 20),
                          onClick=lambda: button_Button_click("info"))
@@ -76,7 +80,7 @@ def button_init(screen, font_button, WIN_HEIGHT):
                          onClick=lambda: button_Button_click("help"))
 
     button_y3 = button_y2 + 30
-    return button_y2, button_y3, button_Open, button_Help, [button_Reset, button_Scramble, button_Undo, button_Open, button_Info, button_Help, button_About]
+    return button_y2, button_y3, button_Open, button_Help, [button_Reset, button_Scramble, button_Undo, button_Open, button_Info, button_Help, button_Photo, button_About]
 
 def main():
     global BTN_CLICK, BTN_CLICK_STR, WIN_WIDTH, WIN_HEIGHT, BORDER, GAME, filename
@@ -121,6 +125,7 @@ def main():
         DISPLAY = (WIN_WIDTH, WIN_HEIGHT + PANEL)  # Группируем ширину и высоту в одну переменную
         GAME = (WIN_WIDTH, WIN_HEIGHT)
         HELP = (WIN_WIDTH // help_mul, WIN_HEIGHT // help_mul)
+        PHOTO = (WIN_WIDTH // help_mul, WIN_HEIGHT // help_mul)
 
         # инициализация окна
         if not fl_reset:
@@ -143,7 +148,7 @@ def main():
         solved = True
 
         mouse_xx, mouse_yy = 0, 0
-        help,help_gen = 0, True
+        help,help_gen,photo,photo_gen = 0, True, 0, True
         animation_on = False
 
         # инициализация кнопок
@@ -153,7 +158,7 @@ def main():
         ################################################################################
         # Основной цикл программы
         while True:
-            timer.tick(100)
+            timer.tick(150)
 
             if not animation_on:
                 fl_break = undo = False
@@ -163,13 +168,13 @@ def main():
                 ################################################################################
                 # обработка событий
                 events = pygame.event.get()
-                fil, fil2 = events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_parts, help, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker)
+                fil, fil2 = events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_parts, help, photo, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker)
 
                 if typeof(fil2) == "str":
                     return fil
                 if typeof(fil) != "str":
                     puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts = fil
-                fl_break, fl_reset, file_ext, BTN_CLICK, BTN_CLICK_STR, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, mouse_xx, mouse_yy = fil2
+                fl_break, fl_reset, file_ext, BTN_CLICK, BTN_CLICK_STR, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy = fil2
                 if fl_break: break
 
                 ################################################################################
@@ -185,6 +190,7 @@ def main():
                     #############################################################################
                     # обработка рандома для Скрамбла
                     if scramble_move > 0:
+                        mouse.set_cursor(SYSTEM_CURSOR_WAITARROW)
                         direction = random.choice([-1, 1])
                         ring_num = random.randint(1, len(puzzle_rings))
                         ring_select = 0
@@ -194,6 +200,8 @@ def main():
 
                     # 1. найдем все части внутри круга
                     part_mas, part_mas_other = find_parts_in_circle(ring, puzzle_parts)
+
+                    if scramble_move > 0 and len(part_mas) == 0: continue
 
                     # 2. повернем все части внутри круга
                     if len(part_mas)>0:
@@ -205,7 +213,7 @@ def main():
 
                             game_sprite = Surface((ring[3] * 2, ring[3] * 2), pygame.SRCALPHA)
 
-                            step, count = int(ring[3] * radians(angle_rotate) / 3), 0
+                            step, count = int(ring[3] * radians(angle_rotate) / 4), 0
                             angle, angle_deg = radians(angle_rotate) / step, angle_rotate / step
                             shift_x, shift_y = ring[1] - ring[3], ring[2] - ring[3]
 
@@ -231,6 +239,7 @@ def main():
                         scramble_move -= 1
                         if scramble_move > 0: continue
                         moves, moves_stack = 0, []
+                        mouse.set_cursor(SYSTEM_CURSOR_ARROW)
 
                     break
 
@@ -290,6 +299,23 @@ def main():
             if help==1:
                 screen.blit(help_screen, (GAME[0]-HELP[0]-BORDER//3, BORDER//3))
                 draw.rect(screen, Color("#B88800"), (GAME[0]-HELP[0]-2*(BORDER//3), 0, HELP[0]+2*(BORDER//3), HELP[1]+2*(BORDER//3)), BORDER//3)
+
+            # окно с фото головоломки
+            if photo_gen:
+                photo_gen = False
+                photo_path1 = os.path.abspath(os.curdir) + "\\Photo\\"+puzzle_name+".jpg"
+                photo_path2 = os.path.abspath(os.curdir) + "\\Photo\\"+puzzle_name+".png"
+                if os.path.isfile(photo_path1):
+                    photo_screen = pygame.image.load(photo_path1)
+                    photo_screen = pygame.transform.scale(photo_screen, PHOTO)
+                elif os.path.isfile(photo_path2):
+                    photo_screen = pygame.image.load(photo_path2)
+                    photo_screen = pygame.transform.scale(photo_screen, PHOTO)
+                else:
+                    photo,photo_screen = 0,""
+            if photo==1 and photo_screen!="":
+                screen.blit(photo_screen, (GAME[0]-PHOTO[0]-BORDER//3, BORDER//3))
+                draw.rect(screen, Color("#B88800"), (GAME[0]-PHOTO[0]-2*(BORDER//3), 0, PHOTO[0]+2*(BORDER//3), PHOTO[1]+2*(BORDER//3)), BORDER//3)
 
             #####################################################################################
             pygame_widgets.update(events)

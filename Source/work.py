@@ -293,7 +293,7 @@ def load_puzzle(fl, init, dirname,filename):
                 return [],0,"","", "Can not open the file"
     return lines, puzzle_kol, dirname, filename,  ""
 
-def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_parts, help, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker):
+def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_parts, help, photo, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker):
     mouse_x, mouse_y, mouse_left, mouse_right, fil = 0, 0, False, False, ""
 
     for ev in events:  # Обрабатываем события
@@ -301,6 +301,7 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
             return SystemExit, "QUIT"
         if (ev.type == KEYDOWN and ev.key == K_ESCAPE):
             help = 0 if help == 1 else help
+            photo = 0 if photo == 1 else photo
         if (ev.type == KEYDOWN and ev.key == K_F1):
             BTN_CLICK = True
             BTN_CLICK_STR = "help"
@@ -323,16 +324,18 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
             BTN_CLICK = True
             BTN_CLICK_STR = "undo"
 
-        if BTN_CLICK_STR == "info" and help != 1:
+        if BTN_CLICK_STR == "info" and help+photo == 0:
             for link in puzzle_link:
                 if link != "":
                     webbrowser.open(link, new=2, autoraise=True)
-        if BTN_CLICK_STR == "about" and help != 1:
+        if BTN_CLICK_STR == "about" and help+photo == 0:
             webbrowser.open("https://twistypuzzles.com/forum/viewtopic.php?t=38581", new=2, autoraise=True)
         if BTN_CLICK_STR == "help":
             help = 1 - help
+        if BTN_CLICK_STR == "photo":
+            photo = 1 - photo
 
-        if BTN_CLICK_STR == "reset" and help != 1:
+        if BTN_CLICK_STR == "reset" and help+photo == 0:
             if not file_ext:
                 fl_break = fl_reset = True
             else:
@@ -351,7 +354,7 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
                             fil = "Unknow error"
                         mb.showerror(message=("Bad puzzle-file: " + fil))
                         window_front(win_caption)
-        if (BTN_CLICK_STR == "open" or BTN_CLICK_STR == "prev" or BTN_CLICK_STR == "next") and help != 1:
+        if (BTN_CLICK_STR == "open" or BTN_CLICK_STR == "prev" or BTN_CLICK_STR == "next") and help+photo == 0:
             fl_break = False
             fil = read_file(dirname, filename, BORDER, PARTS_COLOR, BTN_CLICK_STR)
             window_front(win_caption)
@@ -366,7 +369,7 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
                         fil = "Unknow error"
                     mb.showerror(message=("Bad puzzle-file: " + fil))
                     window_front(win_caption)
-        if ev.type == DROPFILE and help != 1:
+        if ev.type == DROPFILE and help+photo == 0:
             fl_break = False
             fil = read_file("", ev.file, BORDER, PARTS_COLOR, "drop")
             window_front(win_caption)
@@ -391,22 +394,25 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
                 BTN_CLICK_STR = "undo"
 
             if ev.type == MOUSEBUTTONUP and (ev.button == 1 or ev.button == 4) and not BTN_CLICK:
-                if help != 1:
+                if help+photo == 0:
                     mouse_x, mouse_y = ev.pos[0], ev.pos[1]
                     mouse_left = True
                 help = 0 if help == 1 else help
+                photo = 0 if photo == 1 else photo
             if ev.type == MOUSEBUTTONUP and (ev.button == 3 or ev.button == 5) and not BTN_CLICK:
-                if help != 1:
+                if help+photo == 0:
                     mouse_x, mouse_y = ev.pos[0], ev.pos[1]
                     mouse_right = True
                 help = 0 if help == 1 else help
+                photo = 0 if photo == 1 else photo
 
         if BTN_CLICK_STR == "scramble" and help!=1:
             fl_break = False
             scramble_move = len(puzzle_rings)*len(puzzle_parts)
+            if scramble_move<50: scramble_move *= 3
             random.seed()
 
-        if BTN_CLICK_STR == "undo" and help != 1:
+        if BTN_CLICK_STR == "undo" and help+photo == 0:
             fl_break = False
             if len(moves_stack) > 0:
                 undo = True
@@ -417,7 +423,7 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
         BTN_CLICK = False
         BTN_CLICK_STR = ""
 
-    fil2 = fl_break, fl_reset, file_ext, BTN_CLICK, BTN_CLICK_STR, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, mouse_xx, mouse_yy
+    fil2 = fl_break, fl_reset, file_ext, BTN_CLICK, BTN_CLICK_STR, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy
     return fil, fil2
 
 def init_puzzle(BORDER, PARTS_COLOR):
@@ -434,7 +440,7 @@ def init_puzzle(BORDER, PARTS_COLOR):
         Ring: 1,  50, 50, 50, 60
         Ring: 2, 115, 50, 50, 60
         
-        AutoCutParts: Random, 60
+        AutoCutParts: 1R,1R,1R,1R,1R,1R, 2R,2R,2R,2R,2R,2R
         AutoColorParts: 0, 0, 7
         SetColorParts: (1;3;7),6,   (15;18;22),3,   (2;6;9),5,  (17;21;23),4
     """.strip('\n')
@@ -452,6 +458,10 @@ def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     if typeof(fil) == "str": return fil
     puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, set_color_parts, remove_parts, flip_y, flip_x, flip_rotate, skip_check_error = fil
 
+    mouse.set_cursor(SYSTEM_CURSOR_WAITARROW)
+    win_caption = display.get_caption()
+    display.set_caption("Please wait! Loading ...")
+
     # инициализация всех частей. запускаем скрамбл функцию с одновременной нарезкой. запускаем авто раскраску со смешиванием цветов
     if len(auto_cut_parts)>0:
         puzzle_arch,puzzle_parts = init_cut_all_ring_to_parts(puzzle_rings, auto_cut_parts, remove_parts)
@@ -465,6 +475,10 @@ def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
 
     # построение границ деталек
     calc_parts_countur(puzzle_parts,puzzle_arch)
+
+    mouse.set_cursor(SYSTEM_CURSOR_ARROW)
+    if typeof(win_caption)=="str":
+        display.set_caption(win_caption)
 
     return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts
 
