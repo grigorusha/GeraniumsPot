@@ -65,4 +65,5 @@ you can do bandaged parts
 
 ## I made a small instruction for programmers
 I made the process of creating new puzzles very easy. I hope you will like it
-**<a href="https://twistypuzzles.com/forum/viewtopic.php?p=424334#p424334">Instruction for script-makers</a>
+
+**<a href="https://twistypuzzles.com/forum/viewtopic.php?p=424334#p424334">Instruction for script-makers</a>**
