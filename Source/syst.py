@@ -33,18 +33,33 @@ def typeof(your_var):
     else:
         return "type is unknown"
 
-def calc_param(eval, param_calc):
-    if typeof(eval)!="list":
-        eval = [eval]
+def is_number(s):
+    try:
+        float(s) # for int, long and float
+    except ValueError:
+        try:
+            complex(s) # for complex
+        except ValueError:
+            return False
+    return True
 
-    for nn,ev in enumerate(eval):
+def calc_param(elem, param_calc):
+    if typeof(elem)!="list":
+        elem = [elem]
+
+    for nn,ev in enumerate(elem):
         for param in param_calc:
             if param[0] == ev:
                 ev = param[1]
                 break
-        eval[nn] = float(ev)
-    if len(eval)==1:
-        eval = eval[0]
+            if ev.find(param[0]) >= 0:
+                ev = ev.replace(param[0], str(param[1]))
+        try:
+            elem[nn] = eval(ev)
+        except:
+            elem[nn] = float(ev)
+    if len(elem)==1:
+        elem = elem[0]
 
-    return eval
+    return elem
 

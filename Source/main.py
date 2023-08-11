@@ -93,7 +93,7 @@ def main():
 
     file_ext, fl_reset = False, False
     puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, puzzle_kol, auto_marker = "", "", 1, 2, 1, 1
-    puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, remove_parts = [], [], [], [], []
+    puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, remove_parts, copy_parts = [], [], [], [], [], []
     vek_mul = -1
 
     # основная инициализация
@@ -119,7 +119,7 @@ def main():
     while True:
         if not file_ext:
             fil = init_puzzle(BORDER, PARTS_COLOR)
-            puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts = fil
+            puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts = fil
 
         help_mul = 2
         DISPLAY = (WIN_WIDTH, WIN_HEIGHT + PANEL)  # Группируем ширину и высоту в одну переменную
@@ -149,7 +149,7 @@ def main():
 
         mouse_xx, mouse_yy = 0, 0
         help,help_gen,photo,photo_gen = 0, True, 0, True
-        animation_on = False
+        animation_on, events = False, ""
 
         # инициализация кнопок
         button_y2, button_y3, button_Open, button_Help, button_set = button_init(screen, font_button, WIN_HEIGHT)
@@ -167,15 +167,16 @@ def main():
 
                 ################################################################################
                 # обработка событий
-                events = pygame.event.get()
-                fil, fil2 = events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_parts, help, photo, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker)
+                if not help_gen: # при первом цикле, сначала надо полностью нарисовать, потом считывать кнопки
+                    events = pygame.event.get()
+                    fil, fil2 = events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_parts, help, photo, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker)
 
-                if typeof(fil2) == "str":
-                    return fil
-                if typeof(fil) != "str":
-                    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts = fil
-                fl_break, fl_reset, file_ext, BTN_CLICK, BTN_CLICK_STR, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy = fil2
-                if fl_break: break
+                    if typeof(fil2) == "str":
+                        return fil
+                    if typeof(fil) != "str":
+                        puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts = fil
+                    fl_break, fl_reset, file_ext, BTN_CLICK, BTN_CLICK_STR, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy = fil2
+                    if fl_break: break
 
                 ################################################################################
                 # обработка перемещения и нажатия в игровом поле
@@ -191,6 +192,8 @@ def main():
                     # обработка рандома для Скрамбла
                     if scramble_move > 0:
                         mouse.set_cursor(SYSTEM_CURSOR_WAITARROW)
+                        display.set_caption("Please wait! Scrambling ...")
+
                         direction = random.choice([-1, 1])
                         ring_num = random.randint(1, len(puzzle_rings))
                         ring_select = 0
@@ -207,27 +210,27 @@ def main():
                     if len(part_mas)>0:
                         angle_rotate = find_angle_rotate(ring,direction)
 
+                        # 2.1 анимация. сформируем круглый спрайт для дальнейшего вращения
                         if scramble_move == 0:
-                            # 2.1 анимация
                             animation_on = True
 
                             game_sprite = Surface((ring[3] * 2, ring[3] * 2), pygame.SRCALPHA)
 
-                            step, count = int(ring[3] * radians(angle_rotate) / 4), 0
+                            step, count = int(ring[3] * radians(angle_rotate) / puzzle_speed), 0
                             angle, angle_deg = radians(angle_rotate) / step, angle_rotate / step
                             shift_x, shift_y = ring[1] - ring[3], ring[2] - ring[3]
 
-                            part_mas_rot = copy.deepcopy(part_mas)
+                            part_mas_rot = copy.deepcopy(part_mas) # нужно для пересчета координат. чтобы круг вписался в спрайт
 
                             pygame.draw.circle(game_sprite,GRAY_COLOR, (ring[3],ring[3]), ring[3])
                             for nn, part in enumerate(part_mas_rot):
                                 for pos in part[3]:
                                     pos[0], pos[1] = pos[0] - shift_x, pos[1] - shift_y
                                 pygame.draw.polygon(game_sprite, PARTS_COLOR[part[1]], part[3], 0)
-                                pygame.draw.polygon(game_sprite, BLACK_COLOR, part[3], 3)
+                                pygame.draw.polygon(game_sprite, BLACK_COLOR, part[3], COUNTUR)
 
                         # 2.2 поворот в массиве
-                        rotate_part(ring, part_mas, puzzle_arch, radians(angle_rotate), -direction)
+                        rotate_part(ring, part_mas, puzzle_arch, radians(angle_rotate), direction)
                         calc_parts_countur(part_mas, puzzle_arch)
 
                         if not undo:
@@ -240,6 +243,7 @@ def main():
                         if scramble_move > 0: continue
                         moves, moves_stack = 0, []
                         mouse.set_cursor(SYSTEM_CURSOR_ARROW)
+                        display.set_caption(win_caption)
 
                     break
 
@@ -283,9 +287,9 @@ def main():
                 screen.blit(game_scr, (0, 0))
 
             else:
-                # рисуем поворотную часть
+                # рисуем поворотную часть (плавный поворот только круглого спрайта)
                 ring = find_element(ring_num, puzzle_rings)
-                game_sprite_rot = pygame.transform.rotate(game_sprite, angle_deg * count * -direction)
+                game_sprite_rot = pygame.transform.rotate(game_sprite, angle_deg * count * -direction) # по умолчанию вращение против часовой стрелки, поэтому минус
                 game_sprite_new = game_sprite_rot.get_rect(center=(ring[1], ring[2]))
                 screen.blit(game_sprite_rot, game_sprite_new)
 

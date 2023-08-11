@@ -8,10 +8,30 @@ import random
 from part import *
 from syst import *
 
+def draw_all_text(screen, font, font2, puzzle_kol, moves, solved, button_Open, button_Help, button_y2, button_y3):
+    WHITE_COLOR, RED_COLOR, GREEN_COLOR, BLUE_COLOR = "#FFFFFF", "#FF0000", "#008000", "#0000FF"
+
+    # Пишем количество уровней
+    text_puzzles = font2.render(str(puzzle_kol) + ' puzzles', True, WHITE_COLOR)
+    text_puzzles_place = text_puzzles.get_rect(topleft=(button_Open.textRect.right + 10, button_y2 + 1))
+    screen.blit(text_puzzles, text_puzzles_place)
+    # Пишем количество перемещений
+    text_moves = font.render('Moves: ' + str(moves), True, RED_COLOR)
+    text_moves_place = text_moves.get_rect(topleft=(button_Help.textRect.right + 18, button_y2 - 3))
+    screen.blit(text_moves, text_moves_place)
+    # Пишем статус
+    text_solved = font.render('Solved', True, WHITE_COLOR) if solved else font.render('not solved', True, RED_COLOR)
+    text_solved_place = text_solved.get_rect(topleft=(text_moves_place.right + 10, button_y2 - 3))
+    screen.blit(text_solved, text_solved_place)
+    # Пишем подсказку
+    text_info = font2.render('Use: mouse wheel - ring rotate, space button - undo, F11/F12 - prev/next file', True, GREEN_COLOR)
+    text_info_place = text_solved.get_rect(topleft=(10, button_y3 - 3))
+    screen.blit(text_info, text_info_place)
+
 def read_puzzle_lines(lines):
     flip_y = flip_x = flip_rotate = skip_check_error = False
     puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker = "", "", 1, 2, 0
-    puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts = [], [], [], [], [], [], [], []
+    puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts, copy_parts = [], [], [], [], [], [], [], [], []
 
     part_num, param_calc = 0, []
 
@@ -32,6 +52,17 @@ def read_puzzle_lines(lines):
 
         command = stroka[0:pos].strip()
         params = stroka[pos + 1:].strip()
+
+        pos = 0
+        while True:
+            params_str = params[pos:]
+            pos1,pos2 = params_str.find("("),params_str.find(")")
+            if pos1>=0 and pos2>=0:
+                new_par = params_str[pos1+1:pos2].replace(",",";")
+                params = params[0:pos+pos1+1]+new_par+params[pos+pos2:]
+                pos += pos2+1
+            else:
+                break
 
         param_mas = params.split(",")
         for num, par in enumerate(param_mas):
@@ -70,6 +101,8 @@ def read_puzzle_lines(lines):
             auto_cut_parts += param_mas
         elif command == "RemoveParts":
             remove_parts += param_mas
+        elif command == "CopyParts":
+            copy_parts += param_mas
 
         elif command == "AutoColorParts":
             auto_color_parts = param_mas
@@ -116,7 +149,7 @@ def read_puzzle_lines(lines):
             else:
                 return ("Incorrect 'PartArch' parameters. In str=" + str(str_nom))
 
-    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, set_color_parts, remove_parts, flip_y, flip_x, flip_rotate, skip_check_error
+    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error
 
 def align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip_x, flip_y, flip_rotate, BORDER):
     # выровняем относительно осей. чтобы не было сильных сдвигов
@@ -344,7 +377,7 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
                 window_front(win_caption)
 
                 if typeof(fil) != "str":
-                    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts = fil
+                    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts = fil
                     file_ext = fl_break = fl_reset = True
                     if old_width != WIN_WIDTH or old_height != WIN_HEIGHT:
                         fl_reset = False
@@ -360,7 +393,7 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
             window_front(win_caption)
 
             if typeof(fil) != "str":
-                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts = fil
+                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts = fil
                 file_ext = fl_break = True
                 fl_reset = False
             else:
@@ -375,7 +408,7 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
             window_front(win_caption)
 
             if typeof(fil) != "str":
-                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts = fil
+                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts = fil
                 file_ext = fl_break = True
                 fl_reset = False
             else:
@@ -408,7 +441,11 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
 
         if BTN_CLICK_STR == "scramble" and help!=1:
             fl_break = False
-            scramble_move = len(puzzle_rings)*len(puzzle_parts)
+            scramble_mul = 1
+            for ring in puzzle_rings:
+                if typeof(ring[4])=="list":
+                    scramble_mul = 5
+            scramble_move = len(puzzle_rings)*len(puzzle_parts) * scramble_mul
             if scramble_move<50: scramble_move *= 3
             random.seed()
 
@@ -442,7 +479,7 @@ def init_puzzle(BORDER, PARTS_COLOR):
         
         AutoCutParts: 1R,1R,1R,1R,1R,1R, 2R,2R,2R,2R,2R,2R
         AutoColorParts: 0, 0, 7
-        SetColorParts: (1;3;7),6,   (15;18;22),3,   (2;6;9),5,  (17;21;23),4
+        SetColorParts: (1,3,7),6,   (15,18,22),3,   (2,6,9),5,  (17,21,23),4
     """.strip('\n')
 
     fil = read_file("", "", BORDER, PARTS_COLOR, "init", init)
@@ -456,19 +493,21 @@ def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     # прочитаем строки файла
     fil = read_puzzle_lines(lines)
     if typeof(fil) == "str": return fil
-    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, set_color_parts, remove_parts, flip_y, flip_x, flip_rotate, skip_check_error = fil
+    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error = fil
 
     mouse.set_cursor(SYSTEM_CURSOR_WAITARROW)
     win_caption = display.get_caption()
     display.set_caption("Please wait! Loading ...")
 
     # инициализация всех частей. запускаем скрамбл функцию с одновременной нарезкой. запускаем авто раскраску со смешиванием цветов
-    if len(auto_cut_parts)>0:
-        puzzle_arch,puzzle_parts = init_cut_all_ring_to_parts(puzzle_rings, auto_cut_parts, remove_parts)
-    if len(auto_color_parts)>0 or len(set_color_parts)>0:
-        init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, set_color_parts, PARTS_COLOR)
+    puzzle_arch,puzzle_parts = init_cut_all_ring_to_parts(puzzle_rings, auto_cut_parts)
     if len(remove_parts)>0:
         remove_def_parts(puzzle_parts, remove_parts)
+    if len(copy_parts)>0:
+        copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts)
+        sort_and_renum_all_parts(puzzle_parts)
+    if len(auto_color_parts)>0 or len(set_color_parts)>0:
+        init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, set_color_parts, PARTS_COLOR)
 
     # выравнивание, повороты и масштабирование всех координат
     WIN_WIDTH, WIN_HEIGHT, vek_mul = align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip_x, flip_y, flip_rotate, BORDER)
@@ -480,24 +519,4 @@ def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     if typeof(win_caption)=="str":
         display.set_caption(win_caption)
 
-    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts
-
-def draw_all_text(screen, font, font2, puzzle_kol, moves, solved, button_Open, button_Help, button_y2, button_y3):
-    WHITE_COLOR, RED_COLOR, GREEN_COLOR, BLUE_COLOR = "#FFFFFF", "#FF0000", "#008000", "#0000FF"
-
-    # Пишем количество уровней
-    text_puzzles = font2.render(str(puzzle_kol) + ' puzzles', True, WHITE_COLOR)
-    text_puzzles_place = text_puzzles.get_rect(topleft=(button_Open.textRect.right + 10, button_y2 + 1))
-    screen.blit(text_puzzles, text_puzzles_place)
-    # Пишем количество перемещений
-    text_moves = font.render('Moves: ' + str(moves), True, RED_COLOR)
-    text_moves_place = text_moves.get_rect(topleft=(button_Help.textRect.right + 18, button_y2 - 3))
-    screen.blit(text_moves, text_moves_place)
-    # Пишем статус
-    text_solved = font.render('Solved', True, WHITE_COLOR) if solved else font.render('not solved', True, RED_COLOR)
-    text_solved_place = text_solved.get_rect(topleft=(text_moves_place.right + 10, button_y2 - 3))
-    screen.blit(text_solved, text_solved_place)
-    # Пишем подсказку
-    text_info = font2.render('Use: mouse wheel - ring rotate, space button - undo, F11/F12 - prev/next file', True, GREEN_COLOR)
-    text_info_place = text_solved.get_rect(topleft=(10, button_y3 - 3))
-    screen.blit(text_info, text_info_place)
+    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts

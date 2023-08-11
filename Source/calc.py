@@ -108,11 +108,12 @@ def check_circle(center_x, center_y, x, y, rad):
     return (length<=rad, length/rad)
 
 def rotate_point(center_x, center_y, x, y, angle):
-    # поворот точки относительно центра координат
+    # поворот точки относительно центра координат по часовой стрелке
     adjusted_x,adjusted_y = x - center_x, y - center_y
     cos_rad,sin_rad = cos(angle),sin(angle)
-    qx = center_x + cos_rad * adjusted_x + sin_rad * adjusted_y
-    qy = center_y + -sin_rad * adjusted_x + cos_rad * adjusted_y
+    qx = cos_rad * adjusted_x + sin_rad * adjusted_y
+    qy = cos_rad * adjusted_y - sin_rad * adjusted_x
+    qx, qy = center_x + qx, center_y + qy
     return round(qx,10), round(qy,10)
 
 def circles_intersect(x1,y1,r1,x2,y2,r2):

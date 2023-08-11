@@ -1,3 +1,5 @@
+import copy
+
 from calc import *
 from syst import *
 import random
@@ -6,10 +8,10 @@ def rotate_part(ring, part_mas, puzzle_arch, angle, direction):
     # поворот всех частей из массива относительно центра круга
     for part in part_mas:
         for part_arch in part[2]:
-            part_arch[2], part_arch[3] = rotate_point(ring[1], ring[2], part_arch[2], part_arch[3], angle*direction)
+            part_arch[2], part_arch[3] = rotate_point(ring[1], ring[2], part_arch[2], part_arch[3], angle*-direction) # разворачиваем direction, тк центр координат вверху
 
             arch_cur = find_element(part_arch[0], puzzle_arch)
-            arch_x, arch_y = rotate_point(ring[1], ring[2], arch_cur[1], arch_cur[2], angle*direction)
+            arch_x, arch_y = rotate_point(ring[1], ring[2], arch_cur[1], arch_cur[2], angle*-direction)
 
             fl_arch = False
             for arch in puzzle_arch:
@@ -247,6 +249,21 @@ def cut_parts_in_ring(ring, puzzle_arch, puzzle_parts):
                 for nn, part_arch in enumerate(part[2]):
                     if nn <= cut_point[0][1]:
                         part1[2].append([part_arch[0], part_arch[1], part_arch[2], part_arch[3]])
+
+                    # if nn == cut_point[0][1] and nn == cut_point[1][1]:
+                    #     arch = find_element(cut_point[0][0], puzzle_arch)
+                    #     direction = find_angle_direction(cut_point[0][2], cut_point[0][3], cut_point[1][2], cut_point[1][3], arch[1], arch[2])
+                    #     if check_point_in_arch(part_arch[2], part_arch[3], cut_point[0][2], cut_point[0][3], cut_point[1][2], cut_point[1][3], arch[1], arch[2], direction):
+                    #         cut_point1, cut_point2 = cut_point[0], cut_point[1]
+                    #     else:
+                    #         cut_point1, cut_point2 = cut_point[1], cut_point[0]
+                    #     part1[2].append([ring[0], -part_arch[1], cut_point1[2], cut_point1[3]])
+                    #     part1[2].append([part_arch[0], part_arch[1], cut_point2[2], cut_point2[3]])
+                    #
+                    #     part2[2].append([part_arch[0], part_arch[1], cut_point1[2], cut_point1[3]])
+                    #     part2[2].append([ring[0], part_arch[1], cut_point2[2], cut_point2[3]])
+                    #     continue
+
                     if nn == cut_point[0][1]:
                         arch = find_element(cut_point[0][0], puzzle_arch)
                         direction = find_angle_direction(cut_point[0][2], cut_point[0][3], cut_point[1][2], cut_point[1][3], arch[1], arch[2])
@@ -327,23 +344,27 @@ def init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, set_color
                         new_color_ind = len(PARTS_COLOR)-1
                     part[1] = new_color_ind
 
-    while len(set_color_parts)>0:
+    while len(set_color_parts)>1:
         pos_mas = set_color_parts.pop(0)
         color = int(set_color_parts.pop(0))
         if typeof(pos_mas)!="list":
             pos_mas = [pos_mas]
         for pos in pos_mas:
-            if int(pos)>len(puzzle_parts): break
             part = find_element(int(pos),puzzle_parts)
+            if part=="": continue
             part[1] = color
 
 def find_angle_rotate(ring,direction):
     angle_mas, angle_pos = ring[4], ring[5]
     if typeof(angle_mas) == "list":
-        angle_rotate = angle_mas[angle_pos]
-
-        angle_pos += direction
-        angle_pos = 0 if angle_pos == len(angle_mas) else angle_pos if angle_pos >= 0 else len(angle_mas) - 1
+        if direction>0:
+            angle_rotate = angle_mas[angle_pos]
+            angle_pos += direction
+            angle_pos = 0 if angle_pos == len(angle_mas) else angle_pos if angle_pos >= 0 else len(angle_mas) - 1
+        else:
+            angle_pos += direction
+            angle_pos = 0 if angle_pos == len(angle_mas) else angle_pos if angle_pos >= 0 else len(angle_mas) - 1
+            angle_rotate = angle_mas[angle_pos]
         ring[5] = angle_pos
     else:
         angle_rotate = angle_mas
@@ -352,11 +373,17 @@ def find_angle_rotate(ring,direction):
 def turn_ring_and_cut(num_ring, direction, step, puzzle_rings, puzzle_arch, puzzle_parts):
     # повернуть все части внутри круга и запустить нарезку всех пресечений с остальными кругами
     ring1 = find_element(num_ring, puzzle_rings)
-    angle_deg = find_angle_rotate(ring1, -direction)
-    angle = radians(angle_deg)
-
     part_mas, _ = find_parts_in_circle(ring1, puzzle_parts, 1)
-    rotate_part(ring1, part_mas, puzzle_arch, angle*step, direction)
+
+    if typeof(ring1[4])=="list" and step>1:
+        for _ in range(step):
+            angle_deg = find_angle_rotate(ring1, direction)
+            angle = radians(angle_deg)
+            rotate_part(ring1, part_mas, puzzle_arch, angle, -direction)
+    else:
+        angle_deg = find_angle_rotate(ring1, direction)
+        angle = radians(angle_deg)
+        rotate_part(ring1, part_mas, puzzle_arch, angle*step, -direction)  # разворачиваем direction, тк центр координат вверху
     calc_parts_countur(puzzle_parts, puzzle_arch, True)
 
     for mm, ring2 in enumerate(puzzle_rings):
@@ -376,7 +403,71 @@ def remove_def_parts(puzzle_parts, remove_parts):
                 puzzle_parts.pop(nn)
                 break
 
-def init_cut_all_ring_to_parts(puzzle_rings, auto_cut_parts, remove_parts):
+def copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts):
+    # копирование заданных частей - по кругу заданным поворотом
+    while len(copy_parts)>=1:
+        parts_list = copy_parts[0]
+        parts_turn = copy_parts[1]
+
+        part_mas = []
+        if typeof(parts_list) != "list":
+            parts_list = [parts_list]
+        for part_num in parts_list:
+            part = find_element(int(part_num), puzzle_parts)
+            part_num_new = max(puzzle_parts, key=lambda i: i[0])[0] + 1
+            part_new = copy.deepcopy(part)
+            part_new[0] = part_num_new
+            part_mas.append(part_new)
+            puzzle_parts.append(part_new)
+
+        if typeof(parts_turn) != "list":
+            parts_turn = [parts_turn]
+
+        #############################################
+        pos = 0
+        while pos<len(parts_turn):
+            turn = parts_turn[pos]
+            if is_number(turn):
+                num_ring = int(turn[0])
+                ring = find_element(num_ring, puzzle_rings)
+                angle_deg = float(parts_turn[pos+1])
+                direction = 1
+                angle = radians(angle_deg)
+                rotate_part(ring, part_mas, puzzle_arch, angle, -direction)  # разворачиваем direction, тк центр координат вверху
+                pos+=1
+            else:
+                num_ring = int(turn[0])
+                ring = find_element(num_ring, puzzle_rings)
+                direction = 1 if turn[1].upper() == "R" else -1 if turn[1].upper() == "L" else 0
+                if direction == 0: continue
+                step = 1 if len(turn) < 3 else int(turn[2:])
+                if typeof(ring[4]) == "list" and step > 1:
+                    for _ in range(step):
+                        angle_deg = find_angle_rotate(ring, direction)
+                        angle = radians(angle_deg)
+                        rotate_part(ring, part_mas, puzzle_arch, angle, -direction)
+                else:
+                    angle_deg = find_angle_rotate(ring, direction)
+                    angle = radians(angle_deg)
+                    rotate_part(ring, part_mas, puzzle_arch, angle * step, -direction)  # разворачиваем direction, тк центр координат вверху
+            pos += 1
+            calc_parts_countur(puzzle_parts, puzzle_arch, True)
+
+        copy_parts.pop(0)
+        copy_parts.pop(0)
+
+def sort_and_renum_all_parts(puzzle_parts):
+    # сортировка и перенумеровка частей
+    part_mas = []
+    for nn, part in enumerate(puzzle_parts):
+        center_x, center_y = calc_centroid(part[4])
+        part_mas.append( [round(center_x,1), round(center_y,1), part] )
+    part_mas.sort(key=lambda part: (-part[1], part[0]))
+    for nn, part_cent in enumerate(part_mas):
+        part_cent[2][0] = nn+1
+    puzzle_parts.sort(key=lambda part: (part[0]))
+
+def init_cut_all_ring_to_parts(puzzle_rings, auto_cut_parts):
     # инициализируем круги и запускаем нарезку частей с помощью заданной или случайной последовательности
     puzzle_arch, puzzle_parts = [], []
 
@@ -399,10 +490,17 @@ def init_cut_all_ring_to_parts(puzzle_rings, auto_cut_parts, remove_parts):
 
     # авторотация и разбиение на части
     for nn,cut_command in enumerate(auto_cut_parts):
-        if cut_command=="Random":
-            random.seed(1)
+        if (typeof(cut_command)=="list" and cut_command[0]=="Random") or cut_command=="Random":
             num_ring_pred = 0
-            count = int(auto_cut_parts[nn+1])
+            if typeof(cut_command)=="list" and len(cut_command)>2:
+                random.seed(int(cut_command[2]))
+            else:
+                random.seed(1)
+            if typeof(cut_command) == "list":
+                count = int(cut_command[1])
+            else:
+                count = int(auto_cut_parts[nn+1])
+
             for _ in range(count):
                 direction = random.choice([-1, 1])
                 while True:
@@ -411,24 +509,16 @@ def init_cut_all_ring_to_parts(puzzle_rings, auto_cut_parts, remove_parts):
                     num_ring_pred = num_ring
                     break
                 turn_ring_and_cut(num_ring, direction, 1, puzzle_rings, puzzle_arch, puzzle_parts)
-            break
         else:
             if len(cut_command)<2: continue
             num_ring = int(cut_command[0])
-            direction = 1 if cut_command[1]=="R" else -1
+            direction = 1 if cut_command[1].upper()=="R" else -1 if cut_command[1].upper()=="L" else 0
+            if direction==0: continue
             step = 1 if len(cut_command)<3 else int(cut_command[2:])
 
             turn_ring_and_cut(num_ring, direction, step, puzzle_rings, puzzle_arch, puzzle_parts)
 
-    # сортировка и перенумеровка частей
-    part_mas = []
-    for nn, part in enumerate(puzzle_parts):
-        center_x, center_y = calc_centroid(part[4])
-        part_mas.append( [round(center_x,1), round(center_y,1), part] )
-    part_mas.sort(key=lambda part: (-part[1], part[0]))
-    for nn, part_cent in enumerate(part_mas):
-        part_cent[2][0] = nn+1
-    puzzle_parts.sort(key=lambda part: (part[0]))
+    sort_and_renum_all_parts(puzzle_parts)
 
     calc_parts_countur(puzzle_parts, puzzle_arch)
 
