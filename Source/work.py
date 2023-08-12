@@ -33,7 +33,7 @@ def read_puzzle_lines(lines):
     puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker = "", "", 1, 2, 0
     puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts, copy_parts = [], [], [], [], [], [], [], [], []
 
-    part_num, param_calc = 0, []
+    part_num, param_calc, ring_num = 0, [], 1
 
     for nom, stroka in enumerate(lines):
         str_nom = nom + 1
@@ -67,6 +67,7 @@ def read_puzzle_lines(lines):
         param_mas = params.split(",")
         for num, par in enumerate(param_mas):
             par = par.strip()
+            if par=="":continue
             if par.find("(")>=0 and par.find(")")>=0 and par.find(";")>=0:
                 par = par.replace("(","")
                 par = par.replace(")","")
@@ -74,6 +75,10 @@ def read_puzzle_lines(lines):
                 for num2, par2 in enumerate(param_mas2):
                     param_mas2[num2] = par2.strip()
                 par = param_mas2
+            elif par[0]=="(" and par[len(par)-1]==")":
+                par = par.replace("(","")
+                par = par.replace(")","")
+                par = [par]
             param_mas[num] = par
 
         if command == "Name":
@@ -127,7 +132,8 @@ def read_puzzle_lines(lines):
             if len(param_mas) != 5: return ("Incorrect 'Ring' parameters. In str=" + str(str_nom))
             param_mas[1], param_mas[2] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc)
             param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
-            puzzle_rings.append([int(param_mas[0]), param_mas[1], param_mas[2], param_mas[3], param_mas[4], 0])
+            puzzle_rings.append([ring_num, param_mas[1], param_mas[2], param_mas[3], param_mas[4], 0])
+            ring_num += 1
         elif command == "Arch":
             if len(param_mas) != 4: return ("Incorrect 'Arch' parameters. In str=" + str(str_nom))
             param_mas[1], param_mas[2], param_mas[3] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc), calc_param(param_mas[3], param_calc)

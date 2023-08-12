@@ -20,6 +20,12 @@ def find_element(pos, mas):
             return elem
     return ""
 
+def mas_pos(mas_xy, pos):
+    ll = len(mas_xy)
+    if pos >= ll:
+        pos -= ll
+    return mas_xy[pos]
+
 def get_color(colorRGBA1, colorRGBA2):
     # смешиваем два цвета RGB
     alpha = 255 - ((255 - colorRGBA1[3]) * (255 - colorRGBA2[3]) / 255)

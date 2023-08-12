@@ -12,13 +12,35 @@ import copy
 import keyboard
 # import Pillow - for pyinstaller spalsh screen
 
+# TODO 1.  Механизм маркеров : задать, вращение, масштабирование
+# TODO 2.  Разделение частей линиями - для задания узоров
+# TODO 3.  Бандаж заданных частей
+# TODO 4.  Вложенные круги - Крейзи
+# TODO 5.  Вспомогательные круги
+# TODO 6.  Последовательное исполнение скриптов
+# TODO 7.  Hide/Show parts
+# TODO 8.  Поиск пересекающихся частей - вывод инфо об ошибках
+# TODO 9.  Выводить инфо о головоломке: количество частей, кругов
+# TODO 10. Авто-поиск новых кругов
+# TODO 11. Вычисление площади частей
+# TODO 12. Авто удаление микро частей
+# TODO 13. Solved
+# TODO 14. Save
+# TODO 15. Scramble - отдельная функция. проценты
+
+
+# TODO *. Скругление уголков
+# TODO *. Слайдинги горизонтальные
+# TODO *. Шестеренки, Линкед
+# TODO *. Рисунки
+
 BACKGROUND_COLOR = "#000000"
 GRAY_COLOR, GRAY_COLOR2, BLACK_COLOR = "#808080", "#C0C0C0", "#000000"
 WHITE_COLOR, RED_COLOR, GREEN_COLOR, BLUE_COLOR = "#FFFFFF", "#FF0000", "#008000", "#0000FF"
 PARTS_COLOR =    [(255, 255, 255, 255), (30, 30, 30, 255), (200, 200, 200, 255),  # 0 белый 1 черный 2 серый
                   (255, 0, 0, 255), (0, 150, 0, 255), (0, 0, 255, 255),           # 3 красный 4 зеленый 5 синий
                   (255, 255, 0, 255), (128, 0, 128, 255), (0, 128, 128, 255),     # 6 желтый (крас+зел) 7 фиолетовый (кра+син) 8 бирюзовый (зел+син)
-                  (250, 150, 0, 255), (30, 150, 200, 255), (250, 120, 190, 255),  # 9 оранжевый 10 голубой 11 розовый
+                  (250, 150, 0, 255), (100, 200, 250, 255), (250, 120, 190, 255),  # 9 оранжевый 10 голубой 11 розовый
                   (120, 60, 30, 255), (200, 130, 250, 255), (70, 250, 70, 255)]   # 12 коричневый 13 сиреневый 14 лайм
 
 WIN_WIDTH, WIN_HEIGHT = 470, 300
@@ -92,8 +114,8 @@ def main():
         pass
 
     file_ext, fl_reset = False, False
-    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, puzzle_kol, auto_marker = "", "", 1, 2, 1, 1
-    puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, remove_parts, copy_parts = [], [], [], [], [], []
+    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, puzzle_kol, auto_marker, puzzle_link = "", "", 1, 2, 1, 1, []
+    puzzle_rings, puzzle_arch, puzzle_parts, remove_parts, copy_parts = [], [], [], [], []
     vek_mul = -1
 
     # основная инициализация
