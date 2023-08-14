@@ -28,9 +28,9 @@ def draw_all_text(screen, font, font2, puzzle_kol, moves, solved, button_Open, b
     text_info_place = text_solved.get_rect(topleft=(10, button_y3 - 3))
     screen.blit(text_info, text_info_place)
 
-def read_puzzle_lines(lines):
+def read_puzzle_lines_and_init_puzzle(lines,PARTS_COLOR):
     flip_y = flip_x = flip_rotate = skip_check_error = False
-    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker = "", "", 1, 2, 0
+    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker, first_cut = "", "", 1, 2, 0, True
     puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts, copy_parts = [], [], [], [], [], [], [], [], []
 
     part_num, param_calc, ring_num = 0, [], 1
@@ -47,11 +47,15 @@ def read_puzzle_lines(lines):
             stroka = stroka[0:pos]
 
         pos = stroka.find(":")
-        if pos == -1: continue
-        if pos == len(stroka) - 1: continue
-
-        command = stroka[0:pos].strip()
-        params = stroka[pos + 1:].strip()
+        if pos == -1:
+            command = stroka.strip()
+            params = ""
+        else:
+            command = stroka[0:pos].strip()
+            if pos == len(stroka) - 1:
+                params = ""
+            else:
+                params = stroka[pos + 1:].strip()
 
         pos = 0
         while True:
@@ -64,22 +68,28 @@ def read_puzzle_lines(lines):
             else:
                 break
 
-        param_mas = params.split(",")
-        for num, par in enumerate(param_mas):
-            par = par.strip()
-            if par=="":continue
-            if par.find("(")>=0 and par.find(")")>=0 and par.find(";")>=0:
-                par = par.replace("(","")
-                par = par.replace(")","")
-                param_mas2 = par.split(";")
-                for num2, par2 in enumerate(param_mas2):
-                    param_mas2[num2] = par2.strip()
-                par = param_mas2
-            elif par[0]=="(" and par[len(par)-1]==")":
-                par = par.replace("(","")
-                par = par.replace(")","")
-                par = [par]
-            param_mas[num] = par
+        if params=="":
+            param_mas = []
+        else:
+            param_mas = params.split(",")
+            for num, par in enumerate(param_mas):
+                par = par.strip()
+                if par=="":continue
+                if par.find("(")>=0 and par.find(")")>=0 and par.find(";")>=0:
+                    par = par.replace("(","")
+                    par = par.replace(")","")
+                    param_mas2 = par.split(";")
+                    for num2, par2 in enumerate(param_mas2):
+                        param_mas2[num2] = par2.strip()
+                    par = param_mas2
+                elif par[0]=="(" and par[len(par)-1]==")":
+                    par = par.replace("(","")
+                    par = par.replace(")","")
+                    par = [par]
+                param_mas[num] = par
+
+        ##################################################################
+        # инициализация параметров
 
         if command == "Name":
             puzzle_name = params
@@ -102,21 +112,8 @@ def read_puzzle_lines(lines):
             if params.lower().find("rotate") >= 0:
                 flip_rotate = True
 
-        elif command == "AutoCutParts":
-            auto_cut_parts += param_mas
-        elif command == "RemoveParts":
-            remove_parts += param_mas
-        elif command == "CopyParts":
-            copy_parts += param_mas
-
-        elif command == "AutoColorParts":
-            auto_color_parts = param_mas
-        elif command == "SetColorParts":
-            set_color_parts += param_mas
-
-        elif command == "AutoMarker":
-            auto_marker = int(params)
-
+        #########################################################################
+        # инициализация кругов головоломки
         elif command == "Param":
             if len(param_mas) != 2: return ("Incorrect 'Param' parameters. In str=" + str(str_nom))
             for param in param_calc:
@@ -127,25 +124,71 @@ def read_puzzle_lines(lines):
             except:
                 return ("Error in 'Param' calculation. In str=" + str(str_nom))
             param_calc.append([param_mas[0], param_mas[1]])
-
         elif command == "Ring":
             if len(param_mas) != 5: return ("Incorrect 'Ring' parameters. In str=" + str(str_nom))
             param_mas[1], param_mas[2] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc)
             param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
             puzzle_rings.append([ring_num, param_mas[1], param_mas[2], param_mas[3], param_mas[4], 0])
             ring_num += 1
+
+
+        ###############################################################################################################################
+        # инициализация всех частей. запускаем скрамбл функцию с одновременной нарезкой. запускаем авто раскраску со смешиванием цветов
+
+        elif command == "AutoCutParts":
+            auto_cut_parts = param_mas
+            init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, first_cut)
+            first_cut = False
+
+        elif command == "RemoveParts":
+            remove_parts = param_mas
+            remove_def_parts(puzzle_parts, remove_parts)
+
+        elif command == "CopyParts":
+            copy_parts = param_mas
+            copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts)
+
+        elif command == "Renumbering":
+            sort_and_renum_all_parts(puzzle_parts)
+
+        elif command == "HideParts":
+            hide_parts = param_mas
+            hide_show_def_parts(puzzle_parts, hide_parts, -1, False)
+        elif command == "ShowParts":
+            hide_parts = param_mas
+            hide_show_def_parts(puzzle_parts, hide_parts, 1, False)
+        elif command == "HideAllParts":
+            hide_show_def_parts(puzzle_parts, [], -1, True)
+        elif command == "ShowAllParts":
+            hide_show_def_parts(puzzle_parts, [], 1, True)
+
+        elif command == "AutoColorParts":
+            auto_color_parts = param_mas
+            init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, PARTS_COLOR)
+        elif command == "SetColorParts":
+            set_color_parts = param_mas
+            set_color_all_parts(puzzle_parts, puzzle_rings, set_color_parts, PARTS_COLOR)
+
+        elif command == "AutoMarker":
+            if is_number(params):
+                auto_marker = int(params)
+            else:
+                auto_marker =1
+
+
+
+        ########################################################################################
+        # блок для загрузки скомпилированной головоломки. загружаем координаты всех частей
         elif command == "Arch":
             if len(param_mas) != 4: return ("Incorrect 'Arch' parameters. In str=" + str(str_nom))
             param_mas[1], param_mas[2], param_mas[3] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc), calc_param(param_mas[3], param_calc)
             puzzle_arch.append([int(param_mas[0]), param_mas[1], param_mas[2], param_mas[3]])
-
         elif command == "Part":
             if len(param_mas) == 2:
                 part_num = int(param_mas[0])
                 puzzle_parts.append([part_num, int(param_mas[1]), []])
             else:
                 return ("Incorrect 'Part' parameters. In str=" + str(str_nom))
-
         elif command == "PartArch":
             if len(param_mas) == 4 and part_num > 0:
                 part = find_element(part_num, puzzle_parts)
@@ -496,24 +539,14 @@ def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     lines, puzzle_kol, dirname, filename, error_str = load_puzzle(fl, init, dirname, filename)
     if error_str != "": return error_str
 
-    # прочитаем строки файла
-    fil = read_puzzle_lines(lines)
-    if typeof(fil) == "str": return fil
-    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error = fil
-
     mouse.set_cursor(SYSTEM_CURSOR_WAITARROW)
     win_caption = display.get_caption()
     display.set_caption("Please wait! Loading ...")
 
-    # инициализация всех частей. запускаем скрамбл функцию с одновременной нарезкой. запускаем авто раскраску со смешиванием цветов
-    puzzle_arch,puzzle_parts = init_cut_all_ring_to_parts(puzzle_rings, auto_cut_parts)
-    if len(remove_parts)>0:
-        remove_def_parts(puzzle_parts, remove_parts)
-    if len(copy_parts)>0:
-        copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts)
-        sort_and_renum_all_parts(puzzle_parts)
-    if len(auto_color_parts)>0 or len(set_color_parts)>0:
-        init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, set_color_parts, PARTS_COLOR)
+    # прочитаем строки файла
+    fil = read_puzzle_lines_and_init_puzzle(lines, PARTS_COLOR)
+    if typeof(fil) == "str": return fil
+    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error = fil
 
     # выравнивание, повороты и масштабирование всех координат
     WIN_WIDTH, WIN_HEIGHT, vek_mul = align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip_x, flip_y, flip_rotate, BORDER)

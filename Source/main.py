@@ -17,7 +17,6 @@ import keyboard
 # TODO 3.  Бандаж заданных частей
 # TODO 4.  Вложенные круги - Крейзи
 # TODO 5.  Вспомогательные круги
-# TODO 6.  Последовательное исполнение скриптов
 # TODO 7.  Hide/Show parts
 # TODO 8.  Поиск пересекающихся частей - вывод инфо об ошибках
 # TODO 9.  Выводить инфо о головоломке: количество частей, кругов
@@ -290,7 +289,8 @@ def main():
 
                 # отрисовка частей
                 for nn,part in enumerate(puzzle_parts):
-                    pygame.draw.polygon(game_scr,PARTS_COLOR[part[1]],part[3],0)
+                    if part[1]>=0: # отрицательные цвета для скрытых частей
+                        pygame.draw.polygon(game_scr,PARTS_COLOR[part[1]],part[3],0)
                     pygame.draw.polygon(game_scr,BLACK_COLOR,part[3],COUNTUR)
 
                 # отрисовка выделения
