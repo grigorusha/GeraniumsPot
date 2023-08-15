@@ -22,6 +22,7 @@ I have created files for all real intersecting circles puzzles, you can download
 - **F2** - reset the puzzle to its initial state.
 - **F3** - opening a file with a new circles-puzzle
 - **F4** - automatic scramble puzzle
+- **F5** - opens a small window showing the photo with real puzzle.
 - **F11** - previous puzzle
 - **F12** - next puzzle
 ### Programm button
