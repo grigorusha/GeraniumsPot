@@ -22,7 +22,7 @@ def find_element(pos, mas):
 
 def mas_pos(mas_xy, pos):
     ll = len(mas_xy)
-    if pos >= ll:
+    while pos >= ll:
         pos -= ll
     return mas_xy[pos]
 
@@ -67,13 +67,12 @@ def calc_len_polygon(polygon):
     return len_line
 
 def calc_area_polygon(polygon):
-    t = 0
-    for count in range(len(polygon) - 1):
+    area = 0
+    for count in range(-1, len(polygon) - 1):
         y = polygon[count + 1][1] + polygon[count][1]
         x = polygon[count + 1][0] - polygon[count][0]
-        z = y * x
-        t += z
-    return abs(t / 2.0)
+        area += y * x / 2
+    return abs(area)
 
 def calc_centroid(polygon):
     # поиск координат центроида полигона
@@ -170,3 +169,9 @@ def circles_intersect(x1,y1,r1,x2,y2,r2):
         y = -dd
         inter.append( (round(x+x1,10),round(y+y1,10)) )
         return inter
+
+def len_puzzle_rings(puzzle_rings):
+    len_puzzle_rings = 0
+    for ring in puzzle_rings:
+        if ring[6] == 0: len_puzzle_rings += 1
+    return len_puzzle_rings

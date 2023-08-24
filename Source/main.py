@@ -12,21 +12,26 @@ import copy
 import keyboard
 # import Pillow - for pyinstaller spalsh screen
 
-# TODO 1.  Механизм маркеров : задать, вращение, масштабирование
-# TODO 2.  Разделение частей линиями - для задания узоров
-# TODO 3.  Бандаж заданных частей
-# TODO 4.  Вложенные круги - Крейзи
-# TODO 5.  Вспомогательные круги
-# TODO 7.  Hide/Show parts
-# TODO 8.  Поиск пересекающихся частей - вывод инфо об ошибках
-# TODO 9.  Выводить инфо о головоломке: количество частей, кругов
-# TODO 10. Авто-поиск новых кругов
-# TODO 11. Вычисление площади частей
-# TODO 12. Авто удаление микро частей
-# TODO 13. Solved
-# TODO 14. Save
-# TODO 15. Scramble - отдельная функция. проценты
+VERSION = "1.5"
 
+# TODO 1. Изменять окно мышкой
+# TODO 3. Выводить инфо о головоломке: количество частей, кругов
+
+# TODO 1. АвтоКут с углами
+# TODO 1. Много колец
+
+# TODO 2. Поиск пересекающихся частей - вывод инфо об ошибках
+# TODO 1. Обход частей по часовой стрелке
+# TODO 1. Разделение на любое количество частей
+# TODO 6. Бандаж заданных частей
+
+# TODO 1. Галочка: Маркеры
+# TODO 4.  Механизм маркеров : задать, вращение, масштабирование
+# TODO 5.  Разделение частей линиями - для задания узоров
+# TODO 7.  Вложенные круги - Крейзи
+# TODO 8.  Авто-поиск новых кругов
+# TODO 9.  Solved
+# TODO 10. Save
 
 # TODO *. Скругление уголков
 # TODO *. Слайдинги горизонтальные
@@ -60,51 +65,56 @@ def button_Button_click(button_str):
 
 def button_init(screen, font_button, WIN_HEIGHT):
     from pygame_widgets.button import Button
-    GREEN_COLOR, BLUE_COLOR = "#008000", "#0000FF"
+    GREEN_COLOR, LIME_COLOR = (0, 150, 0), (0, 250, 0)
+    BLUE_COLOR, LBLUE_COLOR = (0, 0, 250), (80, 200, 250)
 
     button_y1 = WIN_HEIGHT + 20
     button_Reset = Button(screen, 10, button_y1, 45, 20, text='Reset', fontSize=20, font=font_button, margin=5,
                           radius=3,
-                          inactiveColour=GREEN_COLOR, hoverColour=GREEN_COLOR, pressedColour=(0, 200, 20),
+                          inactiveColour=GREEN_COLOR, hoverColour=LIME_COLOR, pressedColour=LIME_COLOR,
                           onClick=lambda: button_Button_click("reset"))
     button_Scramble = Button(screen, button_Reset.textRect.right + 10, button_y1, 70, 20, text='Scramble',
                              fontSize=20, font=font_button, margin=5, radius=3,
-                             inactiveColour=GREEN_COLOR, hoverColour=GREEN_COLOR, pressedColour=(0, 200, 20),
+                             inactiveColour=GREEN_COLOR, hoverColour=LIME_COLOR, pressedColour=LIME_COLOR,
                              onClick=lambda: button_Button_click("scramble"))
     button_Undo = Button(screen, button_Scramble.textRect.right + 10, button_y1, 40, 20, text='Undo',
                          fontSize=20, font=font_button, margin=5, radius=3,
-                         inactiveColour=GREEN_COLOR, hoverColour=GREEN_COLOR, pressedColour=(0, 200, 20),
+                         inactiveColour=GREEN_COLOR, hoverColour=LIME_COLOR, pressedColour=LIME_COLOR,
                          onClick=lambda: button_Button_click("undo"))
-
-    button_Photo = Button(screen, button_Undo.textRect.right + 20, button_y1, 60, 20, text='Photo ->',
+    button_Redo = Button(screen, button_Undo.textRect.right + 10, button_y1, 40, 20, text='Redo',
                          fontSize=20, font=font_button, margin=5, radius=3,
-                         inactiveColour=BLUE_COLOR, hoverColour=BLUE_COLOR, pressedColour=(0, 200, 20),
+                         inactiveColour=GREEN_COLOR, hoverColour=LIME_COLOR, pressedColour=LIME_COLOR,
+                         onClick=lambda: button_Button_click("redo"))
+
+    button_Photo = Button(screen, button_Redo.textRect.right + 20, button_y1, 60, 20, text='Photo ->',
+                         fontSize=20, font=font_button, margin=5, radius=3,
+                         inactiveColour=BLUE_COLOR, hoverColour=LBLUE_COLOR, pressedColour=LBLUE_COLOR,
                          onClick=lambda: button_Button_click("photo"))
     button_Info = Button(screen, button_Photo.textRect.right + 10, button_y1, 48, 20, text='Info ->',
                          fontSize=20, font=font_button, margin=5, radius=3,
-                         inactiveColour=BLUE_COLOR, hoverColour=BLUE_COLOR, pressedColour=(0, 200, 20),
+                         inactiveColour=BLUE_COLOR, hoverColour=LBLUE_COLOR, pressedColour=LBLUE_COLOR,
                          onClick=lambda: button_Button_click("info"))
     button_About = Button(screen, button_Info.textRect.right + 10, button_y1, 60, 20, text='About ->',
                           fontSize=20, font=font_button, margin=5, radius=3,
-                          inactiveColour=BLUE_COLOR, hoverColour=BLUE_COLOR, pressedColour=(0, 200, 20),
+                          inactiveColour=BLUE_COLOR, hoverColour=LBLUE_COLOR, pressedColour=LBLUE_COLOR,
                           onClick=lambda: button_Button_click("about"))
 
     button_y2 = button_y1 + 25
     button_Open = Button(screen, 10, button_y2, 45, 20, text='Open', fontSize=20, font=font_button, margin=5,
                          radius=3,
-                         inactiveColour=GREEN_COLOR, hoverColour=GREEN_COLOR, pressedColour=(0, 200, 20),
+                         inactiveColour=GREEN_COLOR, hoverColour=LIME_COLOR, pressedColour=LIME_COLOR,
                          onClick=lambda: button_Button_click("open"))
 
     button_Help = Button(screen, button_Scramble.textRect.right + 10, button_y2, 80, 20, text='Solved State',
                          fontSize=20, font=font_button, margin=5, radius=3,
-                         inactiveColour=GREEN_COLOR, hoverColour=GREEN_COLOR, pressedColour=(0, 200, 20),
+                         inactiveColour=GREEN_COLOR, hoverColour=LIME_COLOR, pressedColour=LIME_COLOR,
                          onClick=lambda: button_Button_click("help"))
 
     button_y3 = button_y2 + 30
-    return button_y2, button_y3, button_Open, button_Help, [button_Reset, button_Scramble, button_Undo, button_Open, button_Info, button_Help, button_Photo, button_About]
+    return button_y2, button_y3, button_Open, button_Help, [button_Reset, button_Scramble, button_Undo, button_Redo, button_Open, button_Info, button_Help, button_Photo, button_About]
 
 def main():
-    global BTN_CLICK, BTN_CLICK_STR, WIN_WIDTH, WIN_HEIGHT, BORDER, GAME, filename
+    global VERSION, BTN_CLICK, BTN_CLICK_STR, WIN_WIDTH, WIN_HEIGHT, BORDER, GAME, filename
 
     try:  # pyinstaller spalsh screen
         import pyi_splash
@@ -112,8 +122,8 @@ def main():
     except:
         pass
 
-    file_ext, fl_reset = False, False
-    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, puzzle_kol, auto_marker, puzzle_link = "", "", 1, 2, 1, 1, []
+    file_ext, fl_reset, fl_resize = False, False, False
+    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, puzzle_kol, auto_marker, puzzle_link, puzzle_width, puzzle_height = "", "", 1, 2, 1, 1, [], 0,0
     puzzle_rings, puzzle_arch, puzzle_parts, remove_parts, copy_parts = [], [], [], [], []
     vek_mul = -1
 
@@ -138,9 +148,12 @@ def main():
     ################################################################################
     # перезапуск программы при смене параметров
     while True:
-        if not file_ext:
+        if not file_ext and not fl_resize:
             fil = init_puzzle(BORDER, PARTS_COLOR)
-            puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts = fil
+            if typeof(fil) != "str":
+                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts = fil
+            else:
+                break
 
         help_mul = 2
         DISPLAY = (WIN_WIDTH, WIN_HEIGHT + PANEL)  # Группируем ширину и высоту в одну переменную
@@ -149,28 +162,29 @@ def main():
         PHOTO = (WIN_WIDTH // help_mul, WIN_HEIGHT // help_mul)
 
         # инициализация окна
-        if not fl_reset:
+        if not fl_reset and not fl_resize:
             pos_x = int(screen_width/2 - WIN_WIDTH/2)
             pos_y = int(screen_height - (WIN_HEIGHT + PANEL))
             os.environ['SDL_VIDEO_WINDOW_POS'] = '%i,%i' % (pos_x, pos_y)
             os.environ['SDL_VIDEO_CENTERED'] = '0'
 
-            screen = pygame.display.set_mode(DISPLAY)  # Создаем окошко
-            game_scr = Surface(GAME) # pygame.SRCALPHA
+            screen = pygame.display.set_mode(DISPLAY)  # Создаем окошко RESIZABLE
+        game_scr = Surface(GAME) # pygame.SRCALPHA
 
-        win_caption = puzzle_name if puzzle_name != "" else "Geraniums Pot Simulator"
-        if puzzle_author != "": win_caption += " (" + puzzle_author.strip() + ")"
-        pygame.display.set_caption(win_caption)  # Пишем в шапку
+        if not fl_resize:
+            win_caption = puzzle_name if puzzle_name != "" else "Geraniums Pot Simulator"
+            if puzzle_author != "": win_caption += " (" + puzzle_author.strip() + ")"
+            pygame.display.set_caption(win_caption)  # Пишем в шапку
 
-        keyboard.press_and_release("alt") # странный трюк, чтобы вернуть фокус после сплаш скрина
-        window_front(win_caption)
+            keyboard.press_and_release("alt") # странный трюк, чтобы вернуть фокус после сплаш скрина
+            window_front(win_caption)
 
-        scramble_move, moves, moves_stack = 0, 0, []
-        solved = True
+            moves, moves_stack, redo_stack = 0, [], []
+            solved = True
 
-        mouse_xx, mouse_yy = 0, 0
-        help,help_gen,photo,photo_gen = 0, True, 0, True
-        animation_on, events = False, ""
+            mouse_xx, mouse_yy = 0, 0
+            help,help_gen,photo,photo_gen = 0, True, 0, True
+            animation_on, events = False, ""
 
         # инициализация кнопок
         button_y2, button_y3, button_Open, button_Help, button_set = button_init(screen, font_button, WIN_HEIGHT)
@@ -190,13 +204,13 @@ def main():
                 # обработка событий
                 if not help_gen: # при первом цикле, сначала надо полностью нарисовать, потом считывать кнопки
                     events = pygame.event.get()
-                    fil, fil2 = events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_parts, help, photo, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker)
+                    fil, fil2 = events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker)
 
                     if typeof(fil2) == "str":
                         return fil
                     if typeof(fil) != "str":
-                        puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts = fil
-                    fl_break, fl_reset, file_ext, BTN_CLICK, BTN_CLICK_STR, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy = fil2
+                        puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts = fil
+                    fl_break, fl_reset, file_ext, fl_resize, BTN_CLICK, BTN_CLICK_STR, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy = fil2
                     if fl_break: break
 
                 ################################################################################
@@ -208,47 +222,34 @@ def main():
 
                 ################################################################################
                 # логика игры - выполнение перемещений
-                while ring_num > 0 or scramble_move > 0:
+                while ring_num > 0:
                     #############################################################################
-                    # обработка рандома для Скрамбла
-                    if scramble_move > 0:
-                        mouse.set_cursor(SYSTEM_CURSOR_WAITARROW)
-                        display.set_caption("Please wait! Scrambling ...")
-
-                        direction = random.choice([-1, 1])
-                        ring_num = random.randint(1, len(puzzle_rings))
-                        ring_select = 0
-
-                    # поворот круга
-                    ring = find_element(ring_num, puzzle_rings)
-
                     # 1. найдем все части внутри круга
+                    ring = find_element(ring_num, puzzle_rings)
                     part_mas, part_mas_other = find_parts_in_circle(ring, puzzle_parts)
 
-                    if scramble_move > 0 and len(part_mas) == 0: continue
+                    if len(part_mas) == 0: break
 
                     # 2. повернем все части внутри круга
                     if len(part_mas)>0:
                         angle_rotate = find_angle_rotate(ring,direction)
 
                         # 2.1 анимация. сформируем круглый спрайт для дальнейшего вращения
-                        if scramble_move == 0:
-                            animation_on = True
+                        animation_on = True
 
-                            game_sprite = Surface((ring[3] * 2, ring[3] * 2), pygame.SRCALPHA)
+                        game_sprite = Surface((ring[3] * 2, ring[3] * 2), pygame.SRCALPHA)
 
-                            step, count = int(ring[3] * radians(angle_rotate) / puzzle_speed), 0
-                            angle, angle_deg = radians(angle_rotate) / step, angle_rotate / step
-                            shift_x, shift_y = ring[1] - ring[3], ring[2] - ring[3]
+                        step, count = int(ring[3] * radians(angle_rotate) / puzzle_speed), 0
+                        angle, angle_deg = radians(angle_rotate) / step, angle_rotate / step
+                        shift_x, shift_y = ring[1] - ring[3], ring[2] - ring[3]
 
-                            part_mas_rot = copy.deepcopy(part_mas) # нужно для пересчета координат. чтобы круг вписался в спрайт
-
-                            pygame.draw.circle(game_sprite,GRAY_COLOR, (ring[3],ring[3]), ring[3])
-                            for nn, part in enumerate(part_mas_rot):
-                                for pos in part[3]:
-                                    pos[0], pos[1] = pos[0] - shift_x, pos[1] - shift_y
-                                pygame.draw.polygon(game_sprite, PARTS_COLOR[part[1]], part[3], 0)
-                                pygame.draw.polygon(game_sprite, BLACK_COLOR, part[3], COUNTUR)
+                        pygame.draw.circle(game_sprite,GRAY_COLOR, (ring[3],ring[3]), ring[3])
+                        for nn, part in enumerate(part_mas):
+                            part_mas_rot = copy.deepcopy(part[3])  # нужно для пересчета координат. чтобы круг вписался в спрайт
+                            for pos in part_mas_rot:
+                                pos[0], pos[1] = pos[0] - shift_x, pos[1] - shift_y
+                            pygame.draw.polygon(game_sprite, PARTS_COLOR[part[1]], part_mas_rot, 0)
+                            pygame.draw.polygon(game_sprite, BLACK_COLOR, part_mas_rot, COUNTUR)
 
                         # 2.2 поворот в массиве
                         rotate_part(ring, part_mas, puzzle_arch, radians(angle_rotate), direction)
@@ -257,14 +258,7 @@ def main():
                         if not undo:
                             moves += 1
                             moves_stack.append([ring_num, direction])
-
-                    # 3. скрамбл
-                    if scramble_move > 0:
-                        scramble_move -= 1
-                        if scramble_move > 0: continue
-                        moves, moves_stack = 0, []
-                        mouse.set_cursor(SYSTEM_CURSOR_ARROW)
-                        display.set_caption(win_caption)
+                            redo_stack = []
 
                     break
 
@@ -284,7 +278,7 @@ def main():
 
                 # отрисовка контуров
                 for nn,ring in enumerate(puzzle_rings):
-                    if ring[0]!=ring_select:
+                    if ring[0]!=ring_select and ring[6]==0:
                         pygame.draw.circle(game_scr,GRAY_COLOR2, (ring[1],ring[2]),ring[3]+5,3)
 
                 # отрисовка частей
@@ -328,17 +322,8 @@ def main():
 
             # окно с фото головоломки
             if photo_gen:
-                photo_gen = False
-                photo_path1 = os.path.abspath(os.curdir) + "\\Photo\\"+puzzle_name+".jpg"
-                photo_path2 = os.path.abspath(os.curdir) + "\\Photo\\"+puzzle_name+".png"
-                if os.path.isfile(photo_path1):
-                    photo_screen = pygame.image.load(photo_path1)
-                    photo_screen = pygame.transform.scale(photo_screen, PHOTO)
-                elif os.path.isfile(photo_path2):
-                    photo_screen = pygame.image.load(photo_path2)
-                    photo_screen = pygame.transform.scale(photo_screen, PHOTO)
-                else:
-                    photo,photo_screen = 0,""
+                photo_gen, photo = False, 0
+                photo_screen, PHOTO = find_photo(puzzle_name, PHOTO)
             if photo==1 and photo_screen!="":
                 screen.blit(photo_screen, (GAME[0]-PHOTO[0]-BORDER//3, BORDER//3))
                 draw.rect(screen, Color("#B88800"), (GAME[0]-PHOTO[0]-2*(BORDER//3), 0, PHOTO[0]+2*(BORDER//3), PHOTO[1]+2*(BORDER//3)), BORDER//3)

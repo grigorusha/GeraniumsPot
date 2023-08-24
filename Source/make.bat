@@ -1,3 +1,7 @@
+cd Photo
+del Thumbs.db /S /Q /F /A:SH
+cd ..
+
 rd "C:\Users\Дом\PycharmProjects\GeraniumsPot\dist\Geraniums Pot.exe" /S /Q
 
 "C:\Users\Дом\PycharmProjects\GeraniumsPot\venv11\Scripts\pyinstaller" main.py -n "Geraniums Pot.exe" -i "Geraniums Pot.ico" --onedir --noconsole --splash "splashfile.gif" --upx-dir C:\Users\Дом\PycharmProjects\UPX

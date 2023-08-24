@@ -7,9 +7,10 @@ import random
 
 # puzzle_rings, puzzle_arch, puzzle_parts - формат массивов:
 
-# puzzle_rings - [ring_num, center_x, center_y, radius, angle_deg, _ ]
-#              - [ring_num, center_x, center_y, radius, (angle_deg1,angle_deg2,...), jumble_angle_pos] - angle_deg1+angle_deg2+..=360 deg, jumble_angle_pos = 0,1,..
+# puzzle_rings - [ring_num, center_x, center_y, radius, angle_deg, _ , type]
+#              - [ring_num, center_x, center_y, radius, (angle_deg1,angle_deg2,...), jumble_angle_pos, type] - angle_deg1+angle_deg2+..=360 deg, jumble_angle_pos = 0,1,..
 #              для головоломок с некратными углами, в параметре Angle массив углов, а также позиция текущего угла поворота всего круга.
+#              type - 0 это стандартный кольца, 1 это вспомогательные кольца для нарезки, собственных частей не имеют, как контуры не отображаем
 
 # puzzle_arch  - [arch_num, center_x, center_y, radius]
 #              первые арки полностью совпадают с кольцами. дальше идут вторичные арки которые формируют части
@@ -327,20 +328,22 @@ def init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, PARTS_COL
     for part in puzzle_parts:
         part[1]=0
 
-    if len(auto_color_parts)>len(puzzle_rings):
+    if len(auto_color_parts)>len_puzzle_rings(puzzle_rings):
         for ring in puzzle_rings:
+            if ring[6] != 0: continue
             part_mas, _ = find_parts_in_circle(ring, puzzle_parts, 2)
             for part in part_mas:
                 if part[1]==0:
                     part[1] = ring[0]
-                elif part[1]<len(puzzle_rings):
-                    part[1] += ring[0] + len(puzzle_rings)-2
+                elif part[1]<len_puzzle_rings(puzzle_rings):
+                    part[1] += ring[0] + len_puzzle_rings(puzzle_rings)-2
                 else:
                     part[1] += ring[0]
         for part in puzzle_parts:
             part[1] = int(auto_color_parts[ part[1]-1 ])
     else:
         for ring in puzzle_rings:
+            if ring[6] != 0: continue
             part_mas, _ = find_parts_in_circle(ring, puzzle_parts, 2)
             for part in part_mas:
                 if ring[0]-1 >= len(auto_color_parts): break
@@ -359,7 +362,7 @@ def init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, PARTS_COL
                         new_color_ind = len(PARTS_COLOR)-1
                     part[1] = new_color_ind
 
-def set_color_all_parts(puzzle_parts, puzzle_rings, set_color_parts, PARTS_COLOR):
+def set_color_all_parts(puzzle_parts, set_color_parts):
     # раскраска всех заданных частей
     while len(set_color_parts)>1:
         pos_mas = set_color_parts.pop(0)
@@ -371,8 +374,7 @@ def set_color_all_parts(puzzle_parts, puzzle_rings, set_color_parts, PARTS_COLOR
             if part=="": continue
             part[1] = color
 
-
-def find_angle_rotate(ring,direction):
+def find_angle_rotate(ring,direction,freeze=False):
     angle_mas, angle_pos = ring[4], ring[5]
     if typeof(angle_mas) == "list":
         if direction>0:
@@ -383,7 +385,8 @@ def find_angle_rotate(ring,direction):
             angle_pos += direction
             angle_pos = 0 if angle_pos == len(angle_mas) else angle_pos if angle_pos >= 0 else len(angle_mas) - 1
             angle_rotate = angle_mas[angle_pos]
-        ring[5] = angle_pos
+        if not freeze:
+            ring[5] = angle_pos
     else:
         angle_rotate = angle_mas
     return angle_rotate
@@ -420,6 +423,22 @@ def remove_def_parts(puzzle_parts, remove_parts):
                 puzzle_parts.pop(nn)
                 break
 
+def remove_micro_parts(puzzle_parts, area_param):
+    # удаление заданных частей
+    rem_parts = []
+    for part in puzzle_parts:
+        polygon = part[4]
+        area = calc_area_polygon(polygon)
+        if area<=float(area_param[0]):
+            rem_parts.append(part[0])
+
+    for rem in rem_parts:
+        pos = -1
+        for nn,part in enumerate(puzzle_parts):
+            if part[0]==rem:
+                puzzle_parts.pop(nn)
+                break
+
 def hide_show_def_parts(puzzle_parts, hide_parts, flag, all=False):
     # скрываем заданные части
     if not all:
@@ -429,9 +448,12 @@ def hide_show_def_parts(puzzle_parts, hide_parts, flag, all=False):
             part[1] = abs(part[1])*flag
     else:
         for part in puzzle_parts:
-            part[1] = abs(part[1])*flag
+            if flag==0:
+                part[1] = -part[1]
+            else:
+                part[1] = abs(part[1])*flag
 
-def copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts):
+def copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts, move=False):
     # копирование заданных частей - по кругу заданным поворотом
     while len(copy_parts)>=1:
         parts_list = copy_parts[0]
@@ -442,11 +464,14 @@ def copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts):
             parts_list = [parts_list]
         for part_num in parts_list:
             part = find_element(int(part_num), puzzle_parts)
-            part_num_new = max(puzzle_parts, key=lambda i: i[0])[0] + 1
-            part_new = copy.deepcopy(part)
-            part_new[0] = part_num_new
-            part_mas.append(part_new)
-            puzzle_parts.append(part_new)
+            if move:
+                part_mas.append(part)
+            else:
+                part_num_new = max(puzzle_parts, key=lambda i: i[0])[0] + 1
+                part_new = copy.deepcopy(part)
+                part_new[0] = part_num_new
+                part_mas.append(part_new)
+                puzzle_parts.append(part_new)
 
         if typeof(parts_turn) != "list":
             parts_turn = [parts_turn]
@@ -471,11 +496,11 @@ def copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts):
                 step = 1 if len(turn) < 3 else int(turn[2:])
                 if typeof(ring[4]) == "list" and step > 1:
                     for _ in range(step):
-                        angle_deg = find_angle_rotate(ring, direction)
+                        angle_deg = find_angle_rotate(ring, direction,True)
                         angle = radians(angle_deg)
                         rotate_part(ring, part_mas, puzzle_arch, angle, -direction)
                 else:
-                    angle_deg = find_angle_rotate(ring, direction)
+                    angle_deg = find_angle_rotate(ring, direction,True)
                     angle = radians(angle_deg)
                     rotate_part(ring, part_mas, puzzle_arch, angle * step, -direction)  # разворачиваем direction, тк центр координат вверху
             pos += 1
@@ -547,6 +572,7 @@ def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut
         for ring in puzzle_rings:
             arch = [ring[0], ring[1], ring[2], ring[3]]
             puzzle_arch.append(arch)
+            if ring[6] != 0: continue
 
             color = ring[0] + 2
             part_arch = [ring[0], 1, ring[1], ring[2] + ring[3]]
@@ -586,12 +612,14 @@ def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut
             for nn in range(count):
                 percent = int(100*nn/count)
                 if percent%5==0:
-                    display.set_caption("Please wait! Loading ... "+str(percent+5)+"%")
-                    display.update()
+                    try:
+                        display.set_caption("Please wait! Loading ... "+str(percent+5)+"%")
+                        display.update()
+                    except: pass
 
                 direction = random.choice([-1, 1])
                 while True:
-                    num_ring = random.randint(1, len(puzzle_rings))
+                    num_ring = random.randint(1, len_puzzle_rings(puzzle_rings))
                     if num_ring_pred == num_ring: continue
                     num_ring_pred = num_ring
                     break

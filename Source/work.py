@@ -1,4 +1,5 @@
 from pygame import *
+
 import os
 from tkinter import filedialog as fd
 from tkinter import messagebox as mb
@@ -7,6 +8,31 @@ import random
 
 from part import *
 from syst import *
+
+def find_photo(puzzle_name, PHOTO):
+    photo_screen, photo_path = "", ""
+    dir = os.path.abspath(os.curdir) + "\\Photo"
+    if os.path.isdir(dir):
+        for root, dirs, files in os.walk(dir):
+            for fil in files:
+                if (fil.lower() == puzzle_name.lower() + ".jpg") or (fil.lower() == puzzle_name.lower() + ".png"):
+                    photo_path = root + "\\" + fil
+                    break
+            if photo_path != "": break
+        if os.path.isfile(photo_path):
+            photo_screen = image.load(photo_path)
+            photo_rect = (photo_screen.get_rect().width, photo_screen.get_rect().height)
+            if photo_rect[0] / photo_rect[1] <= PHOTO[0] / PHOTO[1]:
+                scale_ko = PHOTO[1] / photo_rect[1]
+                new_width = int(scale_ko * photo_rect[0])
+                PHOTO = (new_width, PHOTO[1])
+            else:
+                scale_ko = PHOTO[0] / photo_rect[0]
+                new_height = int(scale_ko * photo_rect[1])
+                PHOTO = (PHOTO[0], new_height)
+
+            photo_screen = transform.scale(photo_screen, PHOTO)
+    return photo_screen, PHOTO
 
 def draw_all_text(screen, font, font2, puzzle_kol, moves, solved, button_Open, button_Help, button_y2, button_y3):
     WHITE_COLOR, RED_COLOR, GREEN_COLOR, BLUE_COLOR = "#FFFFFF", "#FF0000", "#008000", "#0000FF"
@@ -28,13 +54,27 @@ def draw_all_text(screen, font, font2, puzzle_kol, moves, solved, button_Open, b
     text_info_place = text_solved.get_rect(topleft=(10, button_y3 - 3))
     screen.blit(text_info, text_info_place)
 
-def read_puzzle_lines_and_init_puzzle(lines,PARTS_COLOR):
-    flip_y = flip_x = flip_rotate = skip_check_error = False
-    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker, first_cut = "", "", 1, 2, 0, True
-    puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts, copy_parts = [], [], [], [], [], [], [], [], []
+def save_state(dirname, filename):
+    command_mas = []
+    command_mas.append(["DirName", dirname, []])
+    command_mas.append(["PuzzleFile", filename, []])
 
-    part_num, param_calc, ring_num = 0, [], 1
+    app_folder = os.path.expanduser('~\\Local Settings\\Geraniums Pot\\')
+    if not os.path.isdir(app_folder):
+        os.mkdir(app_folder)
 
+    app_ini = os.path.expanduser('~\\Local Settings\\Geraniums Pot\\Geraniums Pot.ini')
+    save_file(app_ini, command_mas)
+
+def save_file(filename, command_mas):
+    with open(filename, encoding='utf-8', mode='w') as f:
+        f.write("# Geraniums Pot - Intersecting Circles Puzzles Simulator"+"\n")
+        for command,params,param_mas in command_mas:
+            stroka = ""+command+": "+params+"\n"
+            f.write(stroka)
+
+def expand_script(lines):
+    command_mas = []
     for nom, stroka in enumerate(lines):
         str_nom = nom + 1
         stroka = stroka.replace('\n', '')
@@ -60,37 +100,51 @@ def read_puzzle_lines_and_init_puzzle(lines,PARTS_COLOR):
         pos = 0
         while True:
             params_str = params[pos:]
-            pos1,pos2 = params_str.find("("),params_str.find(")")
-            if pos1>=0 and pos2>=0:
-                new_par = params_str[pos1+1:pos2].replace(",",";")
-                params = params[0:pos+pos1+1]+new_par+params[pos+pos2:]
-                pos += pos2+1
+            pos1, pos2 = params_str.find("("), params_str.find(")")
+            if pos1 >= 0 and pos2 >= 0:
+                new_par = params_str[pos1 + 1:pos2].replace(",", ";")
+                params = params[0:pos + pos1 + 1] + new_par + params[pos + pos2:]
+                pos += pos2 + 1
             else:
                 break
 
-        if params=="":
+        if params == "":
             param_mas = []
         else:
             param_mas = params.split(",")
             for num, par in enumerate(param_mas):
                 par = par.strip()
-                if par=="":continue
-                if par.find("(")>=0 and par.find(")")>=0 and par.find(";")>=0:
-                    par = par.replace("(","")
-                    par = par.replace(")","")
+                if par == "": continue
+                if par.find("(") >= 0 and par.find(")") >= 0 and par.find(";") >= 0:
+                    par = par.replace("(", "")
+                    par = par.replace(")", "")
                     param_mas2 = par.split(";")
                     for num2, par2 in enumerate(param_mas2):
                         param_mas2[num2] = par2.strip()
                     par = param_mas2
-                elif par[0]=="(" and par[len(par)-1]==")":
-                    par = par.replace("(","")
-                    par = par.replace(")","")
+                elif par[0] == "(" and par[len(par) - 1] == ")":
+                    par = par.replace("(", "")
+                    par = par.replace(")", "")
                     par = [par]
                 param_mas[num] = par
 
-        ##################################################################
-        # инициализация параметров
+        command_mas.append([command, params, param_mas, str_nom])
 
+    return command_mas
+
+def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
+    flip_y = flip_x = flip_rotate = skip_check_error = False
+    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker, first_cut = "", "", 1, 2, 0, True
+    puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts, copy_parts = [], [], [], [], [], [], [], [], []
+
+    part_num, param_calc, ring_num = 0, [], 1
+
+    command_mas = expand_script(lines)
+
+    ##################################################################
+    # инициализация параметров
+
+    for command, params, param_mas, str_nom in command_mas:
         if command == "Name":
             puzzle_name = params
         elif command == "Author":
@@ -125,10 +179,11 @@ def read_puzzle_lines_and_init_puzzle(lines,PARTS_COLOR):
                 return ("Error in 'Param' calculation. In str=" + str(str_nom))
             param_calc.append([param_mas[0], param_mas[1]])
         elif command == "Ring":
-            if len(param_mas) != 5: return ("Incorrect 'Ring' parameters. In str=" + str(str_nom))
+            if not (len(param_mas) == 5 or len(param_mas) == 6): return ("Incorrect 'Ring' parameters. In str=" + str(str_nom))
             param_mas[1], param_mas[2] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc)
             param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
-            puzzle_rings.append([ring_num, param_mas[1], param_mas[2], param_mas[3], param_mas[4], 0])
+            param_mas5 = param_mas[5] if len(param_mas)==6 else 0
+            puzzle_rings.append([ring_num, param_mas[1], param_mas[2], param_mas[3], param_mas[4], 0, param_mas5])
             ring_num += 1
 
 
@@ -144,9 +199,16 @@ def read_puzzle_lines_and_init_puzzle(lines,PARTS_COLOR):
             remove_parts = param_mas
             remove_def_parts(puzzle_parts, remove_parts)
 
+        elif command == "RemoveMicroParts":
+            area_param = param_mas
+            remove_micro_parts(puzzle_parts, area_param)
+
         elif command == "CopyParts":
             copy_parts = param_mas
             copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts)
+        elif command == "MoveParts":
+            copy_parts = param_mas
+            copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts, True)
 
         elif command == "Renumbering":
             sort_and_renum_all_parts(puzzle_parts)
@@ -161,13 +223,15 @@ def read_puzzle_lines_and_init_puzzle(lines,PARTS_COLOR):
             hide_show_def_parts(puzzle_parts, [], -1, True)
         elif command == "ShowAllParts":
             hide_show_def_parts(puzzle_parts, [], 1, True)
+        elif command == "InvertAllParts":
+            hide_show_def_parts(puzzle_parts, [], 0, True)
 
         elif command == "AutoColorParts":
             auto_color_parts = param_mas
             init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, PARTS_COLOR)
         elif command == "SetColorParts":
             set_color_parts = param_mas
-            set_color_all_parts(puzzle_parts, puzzle_rings, set_color_parts, PARTS_COLOR)
+            set_color_all_parts(puzzle_parts, set_color_parts)
 
         elif command == "AutoMarker":
             if is_number(params):
@@ -200,9 +264,38 @@ def read_puzzle_lines_and_init_puzzle(lines,PARTS_COLOR):
 
     return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error
 
+def resize_window(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, BORDER):
+    # учтем масштаб
+    if puzzle_scale != 0:
+        shift = BORDER
+        for ring in puzzle_rings:
+            ring[1] = ring[1] * puzzle_scale + shift
+            ring[2] = ring[2] * puzzle_scale + shift
+            ring[3] = ring[3] * puzzle_scale
+        for arch in puzzle_arch:
+            arch[1] = arch[1] * puzzle_scale + shift
+            arch[2] = arch[2] * puzzle_scale + shift
+            arch[3] = arch[3] * puzzle_scale
+        for part in puzzle_parts:
+            for part_arch in part[2]:
+                part_arch[2] = part_arch[2] * puzzle_scale + shift
+                part_arch[3] = part_arch[3] * puzzle_scale + shift
+
+    # изменим размеры окна
+    WIN_WIDTH, WIN_HEIGHT = 0, 0
+    for ring in puzzle_rings:
+        if ring[6]!= 0: continue
+        xx = ring[1] + ring[3] + BORDER
+        WIN_WIDTH = xx if xx > WIN_WIDTH else WIN_WIDTH
+        yy = ring[2] + ring[3] + BORDER
+        WIN_HEIGHT = yy if yy > WIN_HEIGHT else WIN_HEIGHT
+
+    return WIN_WIDTH, WIN_HEIGHT
+
 def align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip_x, flip_y, flip_rotate, BORDER):
     # выровняем относительно осей. чтобы не было сильных сдвигов
     for nn, ring in enumerate(puzzle_rings):
+        if ring[6] != 0: continue
         if nn == 0:
             min_x, min_y = ring[1] - ring[3], ring[2] - ring[3]
         else:
@@ -235,6 +328,7 @@ def align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip
     # иногда контуры колец выходят за край
     min_x = min_y = 0
     for ring in puzzle_rings:
+        if ring[6]!= 0: continue
         shift_xx = ring[1] - (ring[3] + BORDER)
         shift_yy = ring[2] - (ring[3] + BORDER)
         if shift_xx < 0:
@@ -245,8 +339,12 @@ def align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip
                 min_y = -shift_yy
     if min_x > 0 or min_y > 0:
         for ring in puzzle_rings:
+            if ring[6] != 0: continue
             ring[1], ring[2] = ring[1] + min_x, ring[2] + min_y
         for arch in puzzle_arch:
+            if arch[0] <= len_puzzle_rings(puzzle_rings):
+                ring = find_element(arch[0],puzzle_rings)
+                if ring[6] != 0: continue
             arch[1], arch[2] = arch[1] + min_x, arch[2] + min_y
         for part in puzzle_parts:
             for part_arch in part[2]:
@@ -255,6 +353,7 @@ def align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip
     # изменим размеры окна
     WIN_WIDTH, WIN_HEIGHT = 0, 0
     for ring in puzzle_rings:
+        if ring[6]!= 0: continue
         xx = ring[1] + ring[3] + BORDER
         WIN_WIDTH = xx if xx > WIN_WIDTH else WIN_WIDTH
         yy = ring[2] + ring[3] + BORDER
@@ -297,11 +396,15 @@ def align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip
             for part_arch in part[2]:
                 part_arch[1] = -part_arch[1]
 
-    return WIN_WIDTH, WIN_HEIGHT, vek_mul
+    # размер головоломки
+    puzzle_width, puzzle_height = WIN_WIDTH-2*BORDER, WIN_HEIGHT-2*BORDER
+
+    return WIN_WIDTH, WIN_HEIGHT, vek_mul, puzzle_width, puzzle_height
 
 def mouse_move_click(mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, puzzle_rings, ring_num, ring_select, direction):
     ring_pos = []
     for ring in puzzle_rings:
+        if ring[6]!= 0: continue
         pos = check_circle(ring[1], ring[2], mouse_xx, mouse_yy, ring[3])
         if pos[0]:
             ring_pos.append((ring[0], pos[1]))
@@ -328,7 +431,9 @@ def load_puzzle(fl, init, dirname,filename):
         dir += "\\Garden"
     if dir != "":
         for root, dirs, files in os.walk(dir):
-            puzzle_kol += len(files)
+            for fil in files:
+                if os.path.splitext(fil)[1].lower()==".txt":
+                    puzzle_kol += 1
     puzzle_kol = 1 if puzzle_kol==0 else puzzle_kol
 
     ###################################################################################
@@ -375,11 +480,14 @@ def load_puzzle(fl, init, dirname,filename):
                 return [],0,"","", "Can not open the file"
     return lines, puzzle_kol, dirname, filename,  ""
 
-def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_parts, help, photo, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker):
+def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker):
     mouse_x, mouse_y, mouse_left, mouse_right, fil = 0, 0, False, False, ""
+    fl_resize = False
 
     for ev in events:  # Обрабатываем события
         if (ev.type == QUIT):
+            if file_ext:
+                save_state(dirname, filename)
             return SystemExit, "QUIT"
         if (ev.type == KEYDOWN and ev.key == K_ESCAPE):
             help = 0 if help == 1 else help
@@ -396,6 +504,9 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
         if (ev.type == KEYDOWN and ev.key == K_F4):
             BTN_CLICK = True
             BTN_CLICK_STR = "scramble"
+        if (ev.type == KEYDOWN and ev.key == K_F5):
+            BTN_CLICK = True
+            BTN_CLICK_STR = "photo"
         if (ev.type == KEYDOWN and ev.key == K_F11):
             BTN_CLICK = True
             BTN_CLICK_STR = "prev"
@@ -405,13 +516,19 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
         if (ev.type == KEYDOWN and ev.key == K_SPACE):
             BTN_CLICK = True
             BTN_CLICK_STR = "undo"
+        if (ev.type == KEYDOWN and ev.key == K_BACKSPACE):
+            BTN_CLICK = True
+            BTN_CLICK_STR = "redo"
 
         if BTN_CLICK_STR == "info" and help+photo == 0:
             for link in puzzle_link:
                 if link != "":
                     webbrowser.open(link, new=2, autoraise=True)
         if BTN_CLICK_STR == "about" and help+photo == 0:
-            webbrowser.open("https://twistypuzzles.com/forum/viewtopic.php?t=38581", new=2, autoraise=True)
+            mb.showinfo("Geraniums Pot","Geraniums Pot - Intersecting Circles Puzzles Simulator\n"+
+                             "Programmer: Evgeniy Grigoriev. Version "+VERSION)
+            webbrowser.open("https://twistypuzzles.com/forum/viewtopic.php?p=424143#p424143", new=2, autoraise=True)
+            webbrowser.open("https://github.com/grigorusha/GeraniumsPot", new=2, autoraise=True)
         if BTN_CLICK_STR == "help":
             help = 1 - help
         if BTN_CLICK_STR == "photo":
@@ -426,7 +543,7 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
                 window_front(win_caption)
 
                 if typeof(fil) != "str":
-                    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts = fil
+                    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts = fil
                     file_ext = fl_break = fl_reset = True
                     if old_width != WIN_WIDTH or old_height != WIN_HEIGHT:
                         fl_reset = False
@@ -442,9 +559,11 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
             window_front(win_caption)
 
             if typeof(fil) != "str":
-                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts = fil
+                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts = fil
                 file_ext = fl_break = True
                 fl_reset = False
+                if file_ext:
+                    save_state(dirname, filename)
             else:
                 if fil != "-":
                     if fil == "":
@@ -457,9 +576,11 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
             window_front(win_caption)
 
             if typeof(fil) != "str":
-                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts = fil
+                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts = fil
                 file_ext = fl_break = True
                 fl_reset = False
+                if file_ext:
+                    save_state(dirname, filename)
             else:
                 if fil != "-":
                     if fil == "":
@@ -467,13 +588,28 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
                     mb.showerror(message=("Bad puzzle-file: " + fil))
                     window_front(win_caption)
 
+        if ev.type == VIDEORESIZE:
+            # k_wh = WIN_WIDTH/WIN_HEIGHT
+            # if k_wh<=ev.w/ev.h:
+            #
+            # WIN_WIDTH = ev.w
+            # WIN_HEIGHT = ev.h
+
+
+
+
+            fl_resize = True
+
         if ev.type == MOUSEMOTION:
             mouse_xx, mouse_yy = ev.pos[0], ev.pos[1]
 
         if ev.type == MOUSEBUTTONUP:
-            if ev.type == MOUSEBUTTONUP and (ev.button == 2 or ev.button == 6 or ev.button == 7):
+            if ev.type == MOUSEBUTTONUP and (ev.button == 2 or ev.button == 6):
                 BTN_CLICK = True
                 BTN_CLICK_STR = "undo"
+            if ev.type == MOUSEBUTTONUP and (ev.button == 7):
+                BTN_CLICK = True
+                BTN_CLICK_STR = "redo"
 
             if ev.type == MOUSEBUTTONUP and (ev.button == 1 or ev.button == 4) and not BTN_CLICK:
                 if help+photo == 0:
@@ -490,13 +626,8 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
 
         if BTN_CLICK_STR == "scramble" and help!=1:
             fl_break = False
-            scramble_mul = 1
-            for ring in puzzle_rings:
-                if typeof(ring[4])=="list":
-                    scramble_mul = 5
-            scramble_move = len(puzzle_rings)*len(puzzle_parts) * scramble_mul
-            if scramble_move<50: scramble_move *= 3
-            random.seed()
+            scramble_puzzle(puzzle_rings,puzzle_arch,puzzle_parts)
+            moves, moves_stack, redo_stack = 0, [], []
 
         if BTN_CLICK_STR == "undo" and help+photo == 0:
             fl_break = False
@@ -505,33 +636,122 @@ def events_check_read_puzzle(events, fl_break, fl_reset, BTN_CLICK, BTN_CLICK_ST
                 moves -= 1
                 ring_num, direction = moves_stack.pop()
                 direction = -direction
+                redo_stack.append([ring_num, direction])
+
+        if BTN_CLICK_STR == "redo" and help+photo == 0:
+            fl_break = False
+            if len(redo_stack) > 0:
+                undo = True
+                moves += 1
+                ring_num, direction = redo_stack.pop()
+                direction = -direction
+                moves_stack.append([ring_num, direction])
 
         BTN_CLICK = False
         BTN_CLICK_STR = ""
 
-    fil2 = fl_break, fl_reset, file_ext, BTN_CLICK, BTN_CLICK_STR, scramble_move, undo, moves, moves_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy
+    fil2 = fl_break, fl_reset, file_ext, fl_resize, BTN_CLICK, BTN_CLICK_STR, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy
     return fil, fil2
 
-def init_puzzle(BORDER, PARTS_COLOR):
-    init = """
-        Name: Avenger Puzzler
-        Author: Douglas Engel
-        Link: https://twistypuzzles.com/app/museum/museum_showitem.php?pkey=1550
-        
-        Scale: 3
-        Speed: 4
-        Flip: y
-        
-        # ring number, center coordinates x y, radius, angle
-        Ring: 1,  50, 50, 50, 60
-        Ring: 2, 115, 50, 50, 60
-        
-        AutoCutParts: 1R,1R,1R,1R,1R,1R, 2R,2R,2R,2R,2R,2R
-        AutoColorParts: 0, 0, 7
-        SetColorParts: (1,3,7),6,   (15,18,22),3,   (2,6,9),5,  (17,21,23),4
-    """.strip('\n')
+def scramble_puzzle(puzzle_rings,puzzle_arch,puzzle_parts):
+    # обработка рандома для Скрамбла
+    random.seed()
+    mouse.set_cursor(SYSTEM_CURSOR_WAITARROW)
+    win_caption = display.get_caption()
+    display.set_caption("Please wait! Scrambling ...")
 
-    fil = read_file("", "", BORDER, PARTS_COLOR, "init", init)
+    scramble_mul = 1
+    for ring in puzzle_rings:
+        if typeof(ring[4]) == "list":
+            scramble_mul = 2
+    scramble_move = len_puzzle_rings(puzzle_rings) * len(puzzle_parts) * scramble_mul * 3
+
+    step = ring_num_pred = 0
+    while step<=scramble_move:
+        percent = int(100 * step / scramble_move)
+        if percent % 5 == 0:
+            try:
+                display.set_caption("Please wait! Scrambling ... " + str(percent) + "%")
+                display.update()
+            except:
+                pass
+
+        # поворот круга
+        direction = random.choice([-1, 1])
+        while True:
+            ring_num = random.randint(1, len_puzzle_rings(puzzle_rings))
+            if ring_num_pred != ring_num: break
+        ring_num_pred = ring_num
+
+        ring = find_element(ring_num, puzzle_rings)
+
+        # 1. найдем все части внутри круга
+        part_mas, part_mas_other = find_parts_in_circle(ring, puzzle_parts)
+        if (part_mas) == 0: continue
+
+        # 2. повернем все части внутри круга
+        if len(part_mas) > 0:
+            angle_rotate = find_angle_rotate(ring, direction)
+            rotate_part(ring, part_mas, puzzle_arch, radians(angle_rotate), direction)
+            calc_parts_countur(part_mas, puzzle_arch, True)
+        step += 1
+
+    calc_parts_countur(puzzle_parts, puzzle_arch)
+
+    mouse.set_cursor(SYSTEM_CURSOR_ARROW)
+    if typeof(win_caption)=="str":
+        display.set_caption(win_caption)
+    elif typeof(win_caption)=="list":
+        display.set_caption(win_caption[0])
+
+def init_puzzle(BORDER, PARTS_COLOR):
+    dirname = filename = ""
+    app_ini = os.path.expanduser('~\\Local Settings\\Geraniums Pot\\Geraniums Pot.ini')
+    if os.path.isfile(app_ini):
+        lines = []
+        try:
+            with open(app_ini, encoding = 'utf-8', mode = 'r') as f:
+                lines = f.readlines()
+        except:
+            try:
+                with open(app_ini, mode='r') as f:
+                    lines = f.readlines()
+            except:
+                pass
+
+        ini_mas = expand_script(lines)
+        for command, params, param_mas, str_nom in ini_mas:
+            if command == "DirName":
+                dirname = params
+            elif command == "PuzzleFile":
+                filename = params
+
+    fl_init = False
+    if dirname !="" and filename != "":
+        fil = read_file(dirname, filename, BORDER, PARTS_COLOR, "reset")
+        if typeof(fil) == "str":
+            fl_init = True
+
+    if fl_init:
+        init = """
+            Name: Avenger Puzzler
+            Author: Douglas Engel
+            Link: https://twistypuzzles.com/app/museum/museum_showitem.php?pkey=1550
+            
+            Scale: 3
+            Speed: 4
+            Flip: y
+            
+            # ring number, center coordinates x y, radius, angle
+            Ring: 1,  50, 50, 50, 60
+            Ring: 2, 115, 50, 50, 60
+            
+            AutoCutParts: 1R,1R,1R,1R,1R,1R, 2R,2R,2R,2R,2R,2R
+            AutoColorParts: 0, 0, 7
+            SetColorParts: (1,3,7),6,   (15,18,22),3,   (2,6,9),5,  (17,21,23),4
+        """.strip('\n')
+        fil = read_file("", "", BORDER, PARTS_COLOR, "init", init)
+
     return fil
 
 def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
@@ -544,12 +764,12 @@ def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     display.set_caption("Please wait! Loading ...")
 
     # прочитаем строки файла
-    fil = read_puzzle_lines_and_init_puzzle(lines, PARTS_COLOR)
+    fil = read_puzzle_script_and_init_puzzle(lines, PARTS_COLOR)
     if typeof(fil) == "str": return fil
     puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error = fil
 
     # выравнивание, повороты и масштабирование всех координат
-    WIN_WIDTH, WIN_HEIGHT, vek_mul = align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip_x, flip_y, flip_rotate, BORDER)
+    WIN_WIDTH, WIN_HEIGHT, vek_mul, puzzle_width, puzzle_height = align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip_x, flip_y, flip_rotate, BORDER)
 
     # построение границ деталек
     calc_parts_countur(puzzle_parts,puzzle_arch)
@@ -558,4 +778,4 @@ def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     if typeof(win_caption)=="str":
         display.set_caption(win_caption)
 
-    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, auto_marker, remove_parts, copy_parts
+    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts
