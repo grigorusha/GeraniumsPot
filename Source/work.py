@@ -199,7 +199,7 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
             remove_parts = param_mas
             remove_def_parts(puzzle_parts, remove_parts)
 
-        elif command == "RemoveMicroParts":
+        elif command == "RemoveMicroParts" or command == "RemoveSmallParts":
             area_param = param_mas
             remove_micro_parts(puzzle_parts, area_param)
 

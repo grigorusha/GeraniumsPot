@@ -650,9 +650,10 @@ def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut
                 else:
                     # запустить нарезку с заданным кругом
                     num_ring = int(turn_command)
-                    ring1 = find_element(num_ring, puzzle_rings)
-                    cut_parts_in_ring(ring1, puzzle_arch, puzzle_parts)
-                    calc_parts_countur(puzzle_parts, puzzle_arch, True)
+                    if num_ring!=0:
+                        ring1 = find_element(num_ring, puzzle_rings)
+                        cut_parts_in_ring(ring1, puzzle_arch, puzzle_parts)
+                        calc_parts_countur(puzzle_parts, puzzle_arch, True)
                     fl_one_ring = True
             if not fl_one_ring:
                 for mm, ring2 in enumerate(puzzle_rings):
@@ -669,6 +670,7 @@ def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut
             turn_ring_and_cut(num_ring, direction, step, puzzle_rings, puzzle_arch, puzzle_parts)
 
     # найти и удалить дублирующиеся части
+    sort_and_renum_all_parts(puzzle_parts)
     remove_dublikate_parts(puzzle_parts)
     sort_and_renum_all_parts(puzzle_parts)
 
