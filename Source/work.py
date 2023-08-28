@@ -59,11 +59,15 @@ def save_state(dirname, filename):
     command_mas.append(["DirName", dirname, []])
     command_mas.append(["PuzzleFile", filename, []])
 
-    app_folder = os.path.expanduser('~\\Local Settings\\Geraniums Pot\\')
+    app_folder = os.getenv('LOCALAPPDATA')+'\\Geraniums Pot\\'
     if not os.path.isdir(app_folder):
-        os.mkdir(app_folder)
+        try:
+            os.mkdir(app_folder)
+        except: return
+        if not os.path.isdir(app_folder):
+            return
 
-    app_ini = os.path.expanduser('~\\Local Settings\\Geraniums Pot\\Geraniums Pot.ini')
+    app_ini = app_folder+'Geraniums Pot.ini'
     save_file(app_ini, command_mas)
 
 def save_file(filename, command_mas):
@@ -132,9 +136,23 @@ def expand_script(lines):
 
     return command_mas
 
+def rotate_all_parts(puzzle_rings, puzzle_arch, puzzle_parts, rotate_parts_param):
+    center_x,center_y,angle = float(rotate_parts_param[0]),float(rotate_parts_param[1]),float(rotate_parts_param[2])
+    angle = -radians(angle)
+
+    for ring in puzzle_rings:
+        ring[1],ring[2] = rotate_point(center_x,center_y, ring[1],ring[2], -angle) # разворачиваем direction, тк центр координат вверху
+    for arch in puzzle_arch:
+        arch[1],arch[2] = rotate_point(center_x,center_y, arch[1],arch[2], -angle)
+    for part in puzzle_parts:
+        for part_arch in part[2]:
+            part_arch[2], part_arch[3] = rotate_point(center_x,center_y, part_arch[2], part_arch[3], -angle)
+
+    return
+
 def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
     flip_y = flip_x = flip_rotate = skip_check_error = False
-    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker, first_cut = "", "", 1, 2, 0, True
+    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker, auto_marker_ring, first_cut = "", "", 1, 2, 0, 0, True
     puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts, copy_parts = [], [], [], [], [], [], [], [], []
 
     part_num, param_calc, ring_num = 0, [], 1
@@ -186,6 +204,9 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
             puzzle_rings.append([ring_num, param_mas[1], param_mas[2], param_mas[3], param_mas[4], 0, param_mas5])
             ring_num += 1
 
+            arch_num = len(puzzle_arch)+1
+            puzzle_arch.append([arch_num, param_mas[1], param_mas[2], param_mas[3]])
+
 
         ###############################################################################################################################
         # инициализация всех частей. запускаем скрамбл функцию с одновременной нарезкой. запускаем авто раскраску со смешиванием цветов
@@ -194,6 +215,10 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
             auto_cut_parts = param_mas
             init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, first_cut)
             first_cut = False
+
+        elif command == "CutCircles":
+            cut_circles = param_mas
+            cut_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, cut_circles)
 
         elif command == "RemoveParts":
             remove_parts = param_mas
@@ -233,11 +258,20 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
             set_color_parts = param_mas
             set_color_all_parts(puzzle_parts, set_color_parts)
 
+        elif command == "RotateAllParts":
+            rotate_parts_param = param_mas
+            rotate_all_parts(puzzle_rings, puzzle_arch, puzzle_parts, rotate_parts_param)
+
         elif command == "AutoMarker":
             if is_number(params):
                 auto_marker = int(params)
             else:
                 auto_marker =1
+        elif command == "AutoMarkerRing":
+            if is_number(params):
+                auto_marker_ring = int(params)
+            else:
+                auto_marker_ring =1
 
 
 
@@ -262,7 +296,7 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
             else:
                 return ("Incorrect 'PartArch' parameters. In str=" + str(str_nom))
 
-    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error
+    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, auto_marker_ring, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error
 
 def resize_window(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, BORDER):
     # учтем масштаб
@@ -480,7 +514,7 @@ def load_puzzle(fl, init, dirname,filename):
                 return [],0,"","", "Can not open the file"
     return lines, puzzle_kol, dirname, filename,  ""
 
-def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker):
+def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker, auto_marker_ring):
     mouse_x, mouse_y, mouse_left, mouse_right, fil = 0, 0, False, False, ""
     fl_resize = False
 
@@ -504,6 +538,9 @@ def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN
         if (ev.type == KEYDOWN and ev.key == K_F4):
             BTN_CLICK = True
             BTN_CLICK_STR = "scramble"
+        if (ev.type == KEYDOWN and ev.key == K_F8):
+            BTN_CLICK = True
+            BTN_CLICK_STR = "superscramble"
         if (ev.type == KEYDOWN and ev.key == K_F5):
             BTN_CLICK = True
             BTN_CLICK_STR = "photo"
@@ -543,7 +580,7 @@ def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN
                 window_front(win_caption)
 
                 if typeof(fil) != "str":
-                    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts = fil
+                    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
                     file_ext = fl_break = fl_reset = True
                     if old_width != WIN_WIDTH or old_height != WIN_HEIGHT:
                         fl_reset = False
@@ -559,7 +596,7 @@ def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN
             window_front(win_caption)
 
             if typeof(fil) != "str":
-                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts = fil
+                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
                 file_ext = fl_break = True
                 fl_reset = False
                 if file_ext:
@@ -576,7 +613,7 @@ def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN
             window_front(win_caption)
 
             if typeof(fil) != "str":
-                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts = fil
+                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
                 file_ext = fl_break = True
                 fl_reset = False
                 if file_ext:
@@ -624,9 +661,9 @@ def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN
                 help = 0 if help == 1 else help
                 photo = 0 if photo == 1 else photo
 
-        if BTN_CLICK_STR == "scramble" and help!=1:
+        if (BTN_CLICK_STR == "scramble" or BTN_CLICK_STR == "superscramble") and help!=1:
             fl_break = False
-            scramble_puzzle(puzzle_rings,puzzle_arch,puzzle_parts)
+            scramble_puzzle(puzzle_rings,puzzle_arch,puzzle_parts,BTN_CLICK_STR)
             moves, moves_stack, redo_stack = 0, [], []
 
         if BTN_CLICK_STR == "undo" and help+photo == 0:
@@ -653,17 +690,18 @@ def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN
     fil2 = fl_break, fl_reset, file_ext, fl_resize, BTN_CLICK, BTN_CLICK_STR, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy
     return fil, fil2
 
-def scramble_puzzle(puzzle_rings,puzzle_arch,puzzle_parts):
+def scramble_puzzle(puzzle_rings,puzzle_arch,puzzle_parts,type):
     # обработка рандома для Скрамбла
     random.seed()
     mouse.set_cursor(SYSTEM_CURSOR_WAITARROW)
     win_caption = display.get_caption()
     display.set_caption("Please wait! Scrambling ...")
 
-    scramble_mul = 1
+    scramble_mul = 1 if type=="scramble" else 10
     for ring in puzzle_rings:
         if typeof(ring[4]) == "list":
-            scramble_mul = 2
+            scramble_mul *= 2
+            break
     scramble_move = len_puzzle_rings(puzzle_rings) * len(puzzle_parts) * scramble_mul * 3
 
     step = ring_num_pred = 0
@@ -705,8 +743,10 @@ def scramble_puzzle(puzzle_rings,puzzle_arch,puzzle_parts):
         display.set_caption(win_caption[0])
 
 def init_puzzle(BORDER, PARTS_COLOR):
+    fl_init = True
     dirname = filename = ""
-    app_ini = os.path.expanduser('~\\Local Settings\\Geraniums Pot\\Geraniums Pot.ini')
+    app_folder = os.getenv('LOCALAPPDATA')+'\\Geraniums Pot\\'
+    app_ini = app_folder+'Geraniums Pot.ini'
     if os.path.isfile(app_ini):
         lines = []
         try:
@@ -716,8 +756,7 @@ def init_puzzle(BORDER, PARTS_COLOR):
             try:
                 with open(app_ini, mode='r') as f:
                     lines = f.readlines()
-            except:
-                pass
+            except: pass
 
         ini_mas = expand_script(lines)
         for command, params, param_mas, str_nom in ini_mas:
@@ -725,8 +764,8 @@ def init_puzzle(BORDER, PARTS_COLOR):
                 dirname = params
             elif command == "PuzzleFile":
                 filename = params
+                fl_init = False
 
-    fl_init = False
     if dirname !="" and filename != "":
         fil = read_file(dirname, filename, BORDER, PARTS_COLOR, "reset")
         if typeof(fil) == "str":
@@ -766,16 +805,20 @@ def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     # прочитаем строки файла
     fil = read_puzzle_script_and_init_puzzle(lines, PARTS_COLOR)
     if typeof(fil) == "str": return fil
-    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error = fil
+    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, auto_marker_ring, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error = fil
 
     # выравнивание, повороты и масштабирование всех координат
     WIN_WIDTH, WIN_HEIGHT, vek_mul, puzzle_width, puzzle_height = align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip_x, flip_y, flip_rotate, BORDER)
 
     # построение границ деталек
+    remove_dublikate_parts(puzzle_parts)
     calc_parts_countur(puzzle_parts,puzzle_arch)
+
+    for ring in puzzle_rings:
+        ring[5]=0 # сбросим углы поворота для бермуд
 
     mouse.set_cursor(SYSTEM_CURSOR_ARROW)
     if typeof(win_caption)=="str":
         display.set_caption(win_caption)
 
-    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts
+    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts

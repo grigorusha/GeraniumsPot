@@ -12,13 +12,11 @@ import copy
 import keyboard
 # import Pillow - for pyinstaller spalsh screen
 
-VERSION = "1.5"
+VERSION = "1.5.1"
 
+# TODO 1. минимизировать Рандом
 # TODO 1. Изменять окно мышкой
 # TODO 3. Выводить инфо о головоломке: количество частей, кругов
-
-# TODO 1. АвтоКут с углами
-# TODO 1. Много колец
 
 # TODO 2. Поиск пересекающихся частей - вывод инфо об ошибках
 # TODO 1. Обход частей по часовой стрелке
@@ -119,11 +117,10 @@ def main():
     try:  # pyinstaller spalsh screen
         import pyi_splash
         pyi_splash.close()
-    except:
-        pass
+    except: pass
 
     file_ext, fl_reset, fl_resize = False, False, False
-    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, puzzle_kol, auto_marker, puzzle_link, puzzle_width, puzzle_height = "", "", 1, 2, 1, 1, [], 0,0
+    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, puzzle_kol, auto_marker, auto_marker_ring, puzzle_link, puzzle_width, puzzle_height = "", "", 1, 2, 1, 0, 0, [], 0,0
     puzzle_rings, puzzle_arch, puzzle_parts, remove_parts, copy_parts = [], [], [], [], []
     vek_mul = -1
 
@@ -132,6 +129,7 @@ def main():
     font = pygame.font.SysFont('Verdana', 18)
     font2 = pygame.font.SysFont('Verdana', 12)
     font_marker = pygame.font.SysFont('Verdana', 10)
+    font_marker_ring = pygame.font.SysFont('Verdana', 18)
     font_button = pygame.font.SysFont("ArialB", 18)
     timer = pygame.time.Clock()
     Tk().withdraw()
@@ -151,9 +149,8 @@ def main():
         if not file_ext and not fl_resize:
             fil = init_puzzle(BORDER, PARTS_COLOR)
             if typeof(fil) != "str":
-                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts = fil
-            else:
-                break
+                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
+            else: break
 
         help_mul = 2
         DISPLAY = (WIN_WIDTH, WIN_HEIGHT + PANEL)  # Группируем ширину и высоту в одну переменную
@@ -204,12 +201,12 @@ def main():
                 # обработка событий
                 if not help_gen: # при первом цикле, сначала надо полностью нарисовать, потом считывать кнопки
                     events = pygame.event.get()
-                    fil, fil2 = events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker)
+                    fil, fil2 = events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker, auto_marker_ring)
 
                     if typeof(fil2) == "str":
                         return fil
                     if typeof(fil) != "str":
-                        puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, remove_parts, copy_parts = fil
+                        puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
                     fl_break, fl_reset, file_ext, fl_resize, BTN_CLICK, BTN_CLICK_STR, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy = fil2
                     if fl_break: break
 
@@ -297,6 +294,13 @@ def main():
                     for nn, part in enumerate(puzzle_parts):
                         center_x, center_y = calc_centroid(part[4])
                         text_marker = font_marker.render(str(part[0]), True, BLACK_COLOR if part[1]!=1 else WHITE_COLOR)
+                        text_marker_place = text_marker.get_rect(center=(center_x, center_y))
+                        game_scr.blit(text_marker, text_marker_place)  # Пишем маркет
+                if auto_marker_ring:
+                    for nn, ring in enumerate(puzzle_rings):
+                        if ring[6]!=0: continue
+                        center_x, center_y = ring[1],ring[2]
+                        text_marker = font_marker_ring.render(str(ring[0]), True, RED_COLOR)
                         text_marker_place = text_marker.get_rect(center=(center_x, center_y))
                         game_scr.blit(text_marker, text_marker_place)  # Пишем маркет
 
