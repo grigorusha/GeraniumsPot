@@ -148,7 +148,7 @@ def rotate_all_parts(puzzle_rings, puzzle_arch, puzzle_parts, rotate_parts_param
         for part_arch in part[2]:
             part_arch[2], part_arch[3] = rotate_point(center_x,center_y, part_arch[2], part_arch[3], -angle)
 
-    return
+    calc_parts_countur(puzzle_parts, puzzle_arch, True)
 
 def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
     flip_y = flip_x = flip_rotate = skip_check_error = False
@@ -207,6 +207,16 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
             arch_num = len(puzzle_arch)+1
             puzzle_arch.append([arch_num, param_mas[1], param_mas[2], param_mas[3]])
 
+        elif command == "CopyRing":
+            if not (len(param_mas) == 5 or len(param_mas) == 6): return ("Incorrect 'CopyRing' parameters. In str=" + str(str_nom))
+            param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
+            param_mas5 = param_mas[5] if len(param_mas)==6 else 0
+            center_x, center_y = copy_ring(int(param_mas[1]),param_mas[2],puzzle_rings)
+            puzzle_rings.append([ring_num, center_x, center_y, param_mas[3], param_mas[4], 0, param_mas5])
+            ring_num += 1
+
+            arch_num = len(puzzle_arch)+1
+            puzzle_arch.append([arch_num, center_x, center_y, param_mas[3]])
 
         ###############################################################################################################################
         # инициализация всех частей. запускаем скрамбл функцию с одновременной нарезкой. запускаем авто раскраску со смешиванием цветов
@@ -214,6 +224,11 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
         elif command == "AutoCutParts":
             auto_cut_parts = param_mas
             init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, first_cut)
+            first_cut = False
+
+        elif command == "MakeCircles":
+            make_circles = param_mas
+            make_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, make_circles)
             first_cut = False
 
         elif command == "CutCircles":
@@ -259,6 +274,7 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
             set_color_all_parts(puzzle_parts, set_color_parts)
 
         elif command == "RotateAllParts":
+            param_mas[0], param_mas[1], param_mas[2] = calc_param(param_mas[0], param_calc), calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc)
             rotate_parts_param = param_mas
             rotate_all_parts(puzzle_rings, puzzle_arch, puzzle_parts, rotate_parts_param)
 
@@ -273,7 +289,8 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
             else:
                 auto_marker_ring =1
 
-
+        elif command == "End" or command == "Stop" or command == "Exit" or command == "Quit":
+            break
 
         ########################################################################################
         # блок для загрузки скомпилированной головоломки. загружаем координаты всех частей
@@ -334,6 +351,9 @@ def align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip
             min_x, min_y = ring[1] - ring[3], ring[2] - ring[3]
         else:
             min_x, min_y = min(min_x, ring[1] - ring[3]), min(min_y, ring[2] - ring[3])
+    for part in puzzle_parts: # отдельные части могут быть за пределами колец
+        for part_xy in part[4]:
+            min_x, min_y = min(min_x, part_xy[0]), min(min_y, part_xy[1])
 
     for ring in puzzle_rings:
         ring[1], ring[2] = ring[1] - min_x, ring[2] - min_y
@@ -392,6 +412,14 @@ def align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip
         WIN_WIDTH = xx if xx > WIN_WIDTH else WIN_WIDTH
         yy = ring[2] + ring[3] + BORDER
         WIN_HEIGHT = yy if yy > WIN_HEIGHT else WIN_HEIGHT
+
+    calc_parts_countur(puzzle_parts, puzzle_arch, True)
+    for part in puzzle_parts: # отдельные части могут быть за пределами колец
+        for part_xy in part[4]:
+            xx = part_xy[0] + BORDER
+            WIN_WIDTH = xx if xx > WIN_WIDTH else WIN_WIDTH
+            yy = part_xy[1] + BORDER
+            WIN_HEIGHT = yy if yy > WIN_HEIGHT else WIN_HEIGHT
 
     # учтем повороты
     vek_mul = -1
@@ -717,11 +745,11 @@ def scramble_puzzle(puzzle_rings,puzzle_arch,puzzle_parts,type):
         # поворот круга
         direction = random.choice([-1, 1])
         while True:
-            ring_num = random.randint(1, len_puzzle_rings(puzzle_rings))
+            ring_num = random.randint(1, len(puzzle_rings))
+            ring = find_element(ring_num, puzzle_rings)
+            if ring[6]!=0 : continue
             if ring_num_pred != ring_num: break
         ring_num_pred = ring_num
-
-        ring = find_element(ring_num, puzzle_rings)
 
         # 1. найдем все части внутри круга
         part_mas, part_mas_other = find_parts_in_circle(ring, puzzle_parts)
@@ -743,7 +771,7 @@ def scramble_puzzle(puzzle_rings,puzzle_arch,puzzle_parts,type):
         display.set_caption(win_caption[0])
 
 def init_puzzle(BORDER, PARTS_COLOR):
-    fl_init = True
+    fl_init = file_ext = True
     dirname = filename = ""
     app_folder = os.getenv('LOCALAPPDATA')+'\\Geraniums Pot\\'
     app_ini = app_folder+'Geraniums Pot.ini'
@@ -790,8 +818,9 @@ def init_puzzle(BORDER, PARTS_COLOR):
             SetColorParts: (1,3,7),6,   (15,18,22),3,   (2,6,9),5,  (17,21,23),4
         """.strip('\n')
         fil = read_file("", "", BORDER, PARTS_COLOR, "init", init)
+        file_ext = False
 
-    return fil
+    return file_ext, fil
 
 def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     # загрузка файла

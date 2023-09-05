@@ -12,9 +12,10 @@ import copy
 import keyboard
 # import Pillow - for pyinstaller spalsh screen
 
-VERSION = "1.5.1"
+VERSION = "1.5.2"
 
-# TODO 1. минимизировать Рандом
+# TODO 1. Повтор в последовательностях + проценты
+
 # TODO 1. Изменять окно мышкой
 # TODO 3. Выводить инфо о головоломке: количество частей, кругов
 
@@ -147,7 +148,7 @@ def main():
     # перезапуск программы при смене параметров
     while True:
         if not file_ext and not fl_resize:
-            fil = init_puzzle(BORDER, PARTS_COLOR)
+            file_ext, fil = init_puzzle(BORDER, PARTS_COLOR)
             if typeof(fil) != "str":
                 puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
             else: break

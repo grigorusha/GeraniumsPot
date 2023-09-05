@@ -358,13 +358,14 @@ def init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, PARTS_COL
             if part[1] < 0: continue
             part[1] = int(auto_color_parts[ part[1]-1 ])
     else:
+        mm = 0
         for ring in puzzle_rings:
             if ring[6] != 0: continue
             part_mas, _ = find_parts_in_circle(ring, puzzle_parts, 2)
             for part in part_mas:
                 if part[1] < 0: continue
-                if ring[0]-1 >= len(auto_color_parts): break
-                add_color_ind = int(auto_color_parts[ ring[0]-1 ])
+                if mm >= len(auto_color_parts): break
+                add_color_ind = int(auto_color_parts[ mm ])
                 if part[1]==0:
                     part[1] = add_color_ind
                 else:
@@ -378,6 +379,7 @@ def init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, PARTS_COL
                         PARTS_COLOR.append(new_color)
                         new_color_ind = len(PARTS_COLOR)-1
                     part[1] = new_color_ind
+            mm += 1
 
 def set_color_all_parts(puzzle_parts, set_color_parts):
     # раскраска всех заданных частей
@@ -582,6 +584,34 @@ def remove_dublikate_parts(puzzle_parts):
                 puzzle_parts.pop(nn)
                 break
 
+def copy_ring(ring_num,turn_command,puzzle_rings):
+    ring_source = find_element(ring_num, puzzle_rings)
+    center_x, center_y = ring_source[1],ring_source[2]
+
+    if typeof(turn_command) == "list":
+        if len(turn_command)==2:
+            num_ring_center = int(turn_command[0])
+            ring_center = find_element(num_ring_center, puzzle_rings)
+            direction = 1
+            angle_deg = float(turn_command[1])
+            angle = radians(angle_deg)
+            center_x, center_y = rotate_point(ring_center[1], ring_center[2], center_x, center_y, angle *direction)  # разворачиваем direction, тк центр координат вверху
+    else:
+        num_ring_center, direction, step = get_command(turn_command)
+        if num_ring_center != 0:
+            ring_center = find_element(num_ring_center, puzzle_rings)
+            angle_deg = find_angle_rotate(ring_center, direction)
+            angle = radians(angle_deg)
+            center_x, center_y = rotate_point(ring_center[1], ring_center[2], center_x, center_y, angle*step *direction)
+
+    return center_x, center_y
+
+def find_arch(puzzle_arch, ring):
+    for arch in puzzle_arch:
+        if compare_xy(arch[1],ring[1],8) and compare_xy(arch[2],ring[2],8) and compare_xy(arch[3],ring[3],8):
+            return arch[0]
+    return -1
+
 def cut_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, cut_circles):
     for nn,num_ring in enumerate(cut_circles):
         num_ring = int(num_ring)
@@ -591,40 +621,41 @@ def cut_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, cut_circles):
     remove_dublikate_parts(puzzle_parts)
     sort_and_renum_all_parts(puzzle_parts)
 
-def find_arch(puzzle_arch, ring):
-    for arch in puzzle_arch:
-        if compare_xy(arch[1],ring[1],8) and compare_xy(arch[2],ring[2],8) and compare_xy(arch[3],ring[3],8):
-            return arch[0]
-    return -1
+def make_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, make_circles):
+    for ring_num in make_circles:
+        ring = find_element(int(ring_num),puzzle_rings)
+
+        arch_num = find_arch(puzzle_arch, ring)
+        if arch_num < 0:
+            arch_num = len(puzzle_arch)
+            arch = [arch_num, ring[1], ring[2], ring[3]]
+            puzzle_arch.append(arch)
+
+        if ring[6] != 0: continue
+
+        color = ring[0] + 2
+        part_arch = [arch_num, 1, ring[1], ring[2] + ring[3]]
+        part = [len(puzzle_parts)+1, color, [part_arch], [], []]
+        puzzle_parts.append(part)
+
+    calc_parts_countur(puzzle_parts, puzzle_arch, True)
 
 def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, init=True):
     if init:
         # инициализируем круги и запускаем нарезку частей с помощью заданной или случайной последовательности
 
         # сформируем цельные круги
+        make_circles = []
         for ring in puzzle_rings:
-            arch_num = find_arch(puzzle_arch, ring)
-            if arch_num<0:
-                arch_num = len(puzzle_arch)
-                arch = [arch_num, ring[1], ring[2], ring[3]]
-                puzzle_arch.append(arch)
-
-            if ring[6] != 0: continue
-
-
-            color = ring[0] + 2
-            part_arch = [arch_num, 1, ring[1], ring[2] + ring[3]]
-            part = [ring[0], color, [part_arch], [], []]
-            puzzle_parts.append(part)
-
-        calc_parts_countur(puzzle_parts, puzzle_arch, True)
+            make_circles.append(ring[0])
+        make_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, make_circles)
 
         # первичное разбиение кругов на части.
         fl_cutting_circles = True
-        if len(auto_cut_parts)>0:
-            if typeof(auto_cut_parts[0])=="list":
-                if auto_cut_parts[0][0]!="Random" and not is_number(auto_cut_parts[0][0]):
-                    fl_cutting_circles = False
+        # if len(auto_cut_parts)>0:
+        #     if typeof(auto_cut_parts[0])=="list":
+        #         if auto_cut_parts[0][0]!="Random" and not is_number(auto_cut_parts[0][0]):
+        #             fl_cutting_circles = False
 
         if fl_cutting_circles:
             for mm, ring in enumerate(puzzle_rings):
@@ -636,6 +667,7 @@ def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut
 
     # авторотация и разбиение на части
     for nn,cut_command in enumerate(auto_cut_parts):
+        if cut_command=="": continue
         if (typeof(cut_command)=="list" and cut_command[0]=="Random") or cut_command=="Random":
             num_ring_pred = 0
             if typeof(cut_command)=="list" and len(cut_command)>2:
@@ -663,53 +695,64 @@ def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut
                     break
                 turn_ring_and_cut(num_ring, direction, 1, puzzle_rings, puzzle_arch, puzzle_parts)
         elif typeof(cut_command)=="list":
-            fl_one_ring = False
-            for mm, turn_command in enumerate(cut_command):
-                if mm==0 and is_number(turn_command):
-                    num_ring = int(turn_command)
-                    ring = find_element(num_ring, puzzle_rings)
-                    part_mas, _ = find_parts_in_circle(ring, puzzle_parts, 1)
-                    angle_deg = float(cut_command[mm + 1])
-                    direction = 1
-                    angle = radians(angle_deg)
-                    rotate_part(ring, part_mas, puzzle_arch, angle, -direction)  # разворачиваем direction, тк центр координат вверху
-                    calc_parts_countur(puzzle_parts, puzzle_arch, True)
-                    break
+            count = 1
+            if nn+1<len(auto_cut_parts):
+                if is_number(auto_cut_parts[nn+1]):
+                    count = int(auto_cut_parts[nn+1])
 
-                elif not is_number(turn_command):
-                    num_ring, direction, step = get_command(turn_command)
-                    if num_ring == 0: continue
+            if count==1:
+                fl_one_ring = False
+                for mm, turn_command in enumerate(cut_command):
+                    if mm==0 and is_number(turn_command):
+                        num_ring = int(turn_command)
+                        ring = find_element(num_ring, puzzle_rings)
+                        part_mas, _ = find_parts_in_circle(ring, puzzle_parts, 1)
+                        angle_deg = float(cut_command[mm + 1])
+                        direction = 1
+                        angle = radians(angle_deg)
+                        rotate_part(ring, part_mas, puzzle_arch, angle, -direction)  # разворачиваем direction, тк центр координат вверху
+                        calc_parts_countur(puzzle_parts, puzzle_arch, True)
+                        break
 
-                    # повернуть все части внутри круга
-                    ring1 = find_element(num_ring, puzzle_rings)
-                    part_mas, _ = find_parts_in_circle(ring1, puzzle_parts, 1)
-                    if typeof(ring1[4]) == "list" and step > 1:
-                        for _ in range(step):
+                    elif not is_number(turn_command):
+                        num_ring, direction, step = get_command(turn_command)
+                        if num_ring == 0: continue
+
+                        # повернуть все части внутри круга
+                        ring1 = find_element(num_ring, puzzle_rings)
+                        part_mas, _ = find_parts_in_circle(ring1, puzzle_parts, 1)
+                        if typeof(ring1[4]) == "list" and step > 1:
+                            for _ in range(step):
+                                angle_deg = find_angle_rotate(ring1, direction)
+                                angle = radians(angle_deg)
+                                rotate_part(ring1, part_mas, puzzle_arch, angle, -direction)  # разворачиваем direction, тк центр координат вверху
+                        else:
                             angle_deg = find_angle_rotate(ring1, direction)
                             angle = radians(angle_deg)
-                            rotate_part(ring1, part_mas, puzzle_arch, angle, -direction)  # разворачиваем direction, тк центр координат вверху
-                    else:
-                        angle_deg = find_angle_rotate(ring1, direction)
-                        angle = radians(angle_deg)
-                        rotate_part(ring1, part_mas, puzzle_arch, angle * step, -direction)  # разворачиваем direction, тк центр координат вверху
-                    calc_parts_countur(puzzle_parts, puzzle_arch, True)
-                else:
-                    # запустить нарезку с заданным кругом
-                    num_ring = int(turn_command)
-                    if num_ring!=0:
-                        ring1 = find_element(num_ring, puzzle_rings)
-                        cut_parts_in_ring(ring1, puzzle_arch, puzzle_parts)
+                            rotate_part(ring1, part_mas, puzzle_arch, angle * step, -direction)  # разворачиваем direction, тк центр координат вверху
                         calc_parts_countur(puzzle_parts, puzzle_arch, True)
-                    fl_one_ring = True
-            if not fl_one_ring:
-                for mm, ring2 in enumerate(puzzle_rings):
-                    cut_parts_in_ring(ring2, puzzle_arch, puzzle_parts)
-                    calc_parts_countur(puzzle_parts, puzzle_arch, True)
+                    else:
+                        # запустить нарезку с заданным кругом
+                        num_ring = int(turn_command)
+                        if num_ring!=0:
+                            ring1 = find_element(num_ring, puzzle_rings)
+                            cut_parts_in_ring(ring1, puzzle_arch, puzzle_parts)
+                            calc_parts_countur(puzzle_parts, puzzle_arch, True)
+                        fl_one_ring = True
+                if not fl_one_ring:
+                    for mm, ring2 in enumerate(puzzle_rings):
+                        cut_parts_in_ring(ring2, puzzle_arch, puzzle_parts)
+                        calc_parts_countur(puzzle_parts, puzzle_arch, True)
+            else:
+                for _ in range(count):
+                    for mm, turn_command in enumerate(cut_command):
+                        num_ring, direction, step = get_command(turn_command)
+                        if num_ring == 0: continue
+                        turn_ring_and_cut(num_ring, direction, step, puzzle_rings, puzzle_arch, puzzle_parts)
 
         else:
             num_ring, direction, step = get_command(cut_command)
             if num_ring==0: continue
-
             turn_ring_and_cut(num_ring, direction, step, puzzle_rings, puzzle_arch, puzzle_parts)
 
     # найти и удалить дублирующиеся части

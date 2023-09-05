@@ -34,6 +34,7 @@ def typeof(your_var):
         return "type is unknown"
 
 def is_number(s):
+    if typeof(s)!= "str": return False
     try:
         float(s) # for int, long and float
     except ValueError:
