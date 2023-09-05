@@ -12,7 +12,7 @@ import copy
 import keyboard
 # import Pillow - for pyinstaller spalsh screen
 
-VERSION = "1.5.2"
+VERSION = "1.6"
 
 # TODO 1. Повтор в последовательностях + проценты
 

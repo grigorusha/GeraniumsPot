@@ -680,12 +680,12 @@ def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut
                 count = int(auto_cut_parts[nn+1])
 
             for nn in range(count):
-                percent = int(100*nn/count)
-                if percent%5==0:
-                    try:
-                        display.set_caption("Please wait! Loading ... "+str(percent+5)+"%")
-                        display.update()
-                    except: pass
+                # percent = int(100*nn/count)
+                # if percent%5==0:
+                #     try:
+                #         display.set_caption("Please wait! Loading ... "+str(percent+5)+"%")
+                #         display.update()
+                #     except: pass
 
                 direction = random.choice([-1, 1])
                 while True:

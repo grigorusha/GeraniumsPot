@@ -154,15 +154,37 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
     flip_y = flip_x = flip_rotate = skip_check_error = False
     puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker, auto_marker_ring, first_cut = "", "", 1, 2, 0, 0, True
     puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts, copy_parts = [], [], [], [], [], [], [], [], []
-
     part_num, param_calc, ring_num = 0, [], 1
 
     command_mas = expand_script(lines)
+
+    step,step_total = 0,1
+    for command, params, param_mas, _ in command_mas:
+        if ["Ring","CopyRing","Renumbering","AutoColorParts","SetColorParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts","HideAllParts","ShowAllParts","InvertAllParts"].count(command)>0:
+            step_total += 1
+        elif ["MakeCircles","CutCircles","RemoveParts","HideParts","ShowParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts"].count(command)>0:
+            step_total += len(param_mas)
+        elif ["AutoCutParts","CopyParts","MoveParts"].count(command)>0:
+            step_total += len(param_mas)
 
     ##################################################################
     # инициализация параметров
 
     for command, params, param_mas, str_nom in command_mas:
+        if ["Ring","CopyRing","Renumbering","AutoColorParts","SetColorParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts","HideAllParts","ShowAllParts","InvertAllParts"].count(command)>0:
+            step += 1
+        elif ["MakeCircles","CutCircles","RemoveParts","HideParts","ShowParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts"].count(command)>0:
+            step += len(param_mas)
+        elif ["AutoCutParts","CopyParts","MoveParts"].count(command)>0:
+            step += len(param_mas)
+
+        percent = int(100 * step / step_total)
+        if percent%5==0 and percent!=0:
+            try:
+                display.set_caption("Please wait! Loading ... " + str(percent) + "%")
+                display.update()
+            except: pass
+
         if command == "Name":
             puzzle_name = params
         elif command == "Author":
