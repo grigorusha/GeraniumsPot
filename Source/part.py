@@ -652,10 +652,16 @@ def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut
 
         # первичное разбиение кругов на части.
         fl_cutting_circles = True
-        # if len(auto_cut_parts)>0:
-        #     if typeof(auto_cut_parts[0])=="list":
-        #         if auto_cut_parts[0][0]!="Random" and not is_number(auto_cut_parts[0][0]):
-        #             fl_cutting_circles = False
+
+        # нужно пропустить при таком синтаксисе, тк запускаем не все круги: AutoCutParts: (1L, 3L2, 1R), (1L, 3R2, 1R, 2), (1L, 2R2, 1R, 1,3)
+        if len(auto_cut_parts)>0:
+            if typeof(auto_cut_parts[0])=="list":
+                fl_cutting_circles = False
+                if (auto_cut_parts[0][0]=="Random" or is_number(auto_cut_parts[0][0])):
+                    fl_cutting_circles = True
+                elif len(auto_cut_parts)>1:
+                    if not is_number(auto_cut_parts[0][0]) and is_number(auto_cut_parts[1]):
+                        fl_cutting_circles = True
 
         if fl_cutting_circles:
             for mm, ring in enumerate(puzzle_rings):
