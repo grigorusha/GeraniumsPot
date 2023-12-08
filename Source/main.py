@@ -4,33 +4,39 @@ from syst import *
 import pygame
 import pygame_widgets
 
-from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians
+from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians, degrees
 
 from tkinter import Tk
 import os
 import copy
 import keyboard
+import ptext
 # import Pillow - for pyinstaller spalsh screen
 
-VERSION = "1.6"
+VERSION = "1.8"
 
-# TODO 1. Повтор в последовательностях + проценты
+# TODO 1. Поиск пересекающихся частей - вывод инфо об ошибках
 
-# TODO 1. Изменять окно мышкой
-# TODO 3. Выводить инфо о головоломке: количество частей, кругов
+# TODO 1. Поиск дубликатов - игнор микро-отрезков
+# TODO 1. расчет параметров без переменных
+# TODO 1. параметры похожие: перем и перем1 и перем10
+# TODO 1. Команды - любой регистр
 
-# TODO 2. Поиск пересекающихся частей - вывод инфо об ошибках
-# TODO 1. Обход частей по часовой стрелке
-# TODO 1. Разделение на любое количество частей
-# TODO 6. Бандаж заданных частей
+# TODO 2. Бандаж заданных частей
 
-# TODO 1. Галочка: Маркеры
-# TODO 4.  Механизм маркеров : задать, вращение, масштабирование
-# TODO 5.  Разделение частей линиями - для задания узоров
-# TODO 7.  Вложенные круги - Крейзи
-# TODO 8.  Авто-поиск новых кругов
-# TODO 9.  Solved
-# TODO 10. Save
+# TODO 3. Повтор в последовательностях + проценты
+# TODO 3. Разделение частей линиями - для задания узоров
+# TODO 3. Зеркальное отражение частей
+# TODO 3. RotateCircles
+
+# TODO 4. Изменять окно мышкой
+# TODO 4. Выводить инфо о головоломке: количество частей, кругов
+
+# TODO 5. Галочка: Маркеры
+# TODO 5. Контурные отверстия в частях
+# TODO 5. Авто-поиск новых кругов
+# TODO 5. Solved
+# TODO 5. Save
 
 # TODO *. Скругление уголков
 # TODO *. Слайдинги горизонтальные
@@ -38,9 +44,9 @@ VERSION = "1.6"
 # TODO *. Рисунки
 
 BACKGROUND_COLOR = "#000000"
-GRAY_COLOR, GRAY_COLOR2, BLACK_COLOR = "#808080", "#C0C0C0", "#000000"
+GRAY_COLOR, GRAY_COLOR2, BLACK_COLOR = "#606060", "#C0C0C0", "#000000"
 WHITE_COLOR, RED_COLOR, GREEN_COLOR, BLUE_COLOR = "#FFFFFF", "#FF0000", "#008000", "#0000FF"
-PARTS_COLOR =    [(255, 255, 255, 255), (30, 30, 30, 255), (200, 200, 200, 255),  # 0 белый 1 черный 2 серый
+PARTS_COLOR =    [(255, 255, 255, 255), (30, 30, 30, 255), (150, 150, 150, 255),  # 0 белый 1 черный 2 серый
                   (255, 0, 0, 255), (0, 150, 0, 255), (0, 0, 255, 255),           # 3 красный 4 зеленый 5 синий
                   (255, 255, 0, 255), (128, 0, 128, 255), (0, 128, 128, 255),     # 6 желтый (крас+зел) 7 фиолетовый (кра+син) 8 бирюзовый (зел+син)
                   (250, 150, 0, 255), (100, 200, 250, 255), (250, 120, 190, 255),  # 9 оранжевый 10 голубой 11 розовый
@@ -115,11 +121,6 @@ def button_init(screen, font_button, WIN_HEIGHT):
 def main():
     global VERSION, BTN_CLICK, BTN_CLICK_STR, WIN_WIDTH, WIN_HEIGHT, BORDER, GAME, filename
 
-    try:  # pyinstaller spalsh screen
-        import pyi_splash
-        pyi_splash.close()
-    except: pass
-
     file_ext, fl_reset, fl_resize = False, False, False
     puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, puzzle_kol, auto_marker, auto_marker_ring, puzzle_link, puzzle_width, puzzle_height = "", "", 1, 2, 1, 0, 0, [], 0,0
     puzzle_rings, puzzle_arch, puzzle_parts, remove_parts, copy_parts = [], [], [], [], []
@@ -148,14 +149,20 @@ def main():
     # перезапуск программы при смене параметров
     while True:
         if not file_ext and not fl_resize:
-            file_ext, fil = init_puzzle(BORDER, PARTS_COLOR)
+            file_ext, fil = init_puzzle(BORDER, PARTS_COLOR, VERSION)
+
+            try:  # pyinstaller spalsh screen
+                import pyi_splash
+                pyi_splash.close()
+            except: pass
+
             if typeof(fil) != "str":
                 puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
             else: break
 
         help_mul = 2
         DISPLAY = (WIN_WIDTH, WIN_HEIGHT + PANEL)  # Группируем ширину и высоту в одну переменную
-        GAME = (WIN_WIDTH, WIN_HEIGHT)
+        GAME = (puzzle_width+BORDER*2, puzzle_height+BORDER*2)
         HELP = (WIN_WIDTH // help_mul, WIN_HEIGHT // help_mul)
         PHOTO = (WIN_WIDTH // help_mul, WIN_HEIGHT // help_mul)
 
@@ -166,7 +173,7 @@ def main():
             os.environ['SDL_VIDEO_WINDOW_POS'] = '%i,%i' % (pos_x, pos_y)
             os.environ['SDL_VIDEO_CENTERED'] = '0'
 
-            screen = pygame.display.set_mode(DISPLAY)  # Создаем окошко RESIZABLE
+            screen = pygame.display.set_mode(DISPLAY, RESIZABLE)  # Создаем окошко
         game_scr = Surface(GAME) # pygame.SRCALPHA
 
         if not fl_resize:
@@ -183,6 +190,7 @@ def main():
             mouse_xx, mouse_yy = 0, 0
             help,help_gen,photo,photo_gen = 0, True, 0, True
             animation_on, events = False, ""
+        fl_resize = False
 
         # инициализация кнопок
         button_y2, button_y3, button_Open, button_Help, button_set = button_init(screen, font_button, WIN_HEIGHT)
@@ -209,7 +217,7 @@ def main():
                     if typeof(fil) != "str":
                         puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
                     fl_break, fl_reset, file_ext, fl_resize, BTN_CLICK, BTN_CLICK_STR, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy = fil2
-                    if fl_break: break
+                    if fl_break or fl_resize: break
 
                 ################################################################################
                 # обработка перемещения и нажатия в игровом поле
@@ -243,11 +251,20 @@ def main():
 
                         pygame.draw.circle(game_sprite,GRAY_COLOR, (ring[3],ring[3]), ring[3])
                         for nn, part in enumerate(part_mas):
-                            part_mas_rot = copy.deepcopy(part[3])  # нужно для пересчета координат. чтобы круг вписался в спрайт
+                            part_mas_rot = copy.deepcopy(part[7])  # нужно для пересчета координат. чтобы круг вписался в спрайт
                             for pos in part_mas_rot:
                                 pos[0], pos[1] = pos[0] - shift_x, pos[1] - shift_y
                             pygame.draw.polygon(game_sprite, PARTS_COLOR[part[1]], part_mas_rot, 0)
                             pygame.draw.polygon(game_sprite, BLACK_COLOR, part_mas_rot, COUNTUR)
+
+                            if len(part[3])==0: continue
+                            marker_text, marker_angle, marker_size, marker_horizontal_shift, marker_vertical_shift, marker_sprite = part[3]
+                            center_x, center_y, area = part[4]
+                            center_x, center_y = center_x-shift_x - puzzle_scale*marker_horizontal_shift, center_y-shift_y - puzzle_scale*marker_vertical_shift
+
+                            marker_sprite = pygame.transform.rotate(marker_sprite, marker_angle)
+                            text_marker_place = marker_sprite.get_rect(center=(center_x, center_y))
+                            game_sprite.blit(marker_sprite, text_marker_place)  # Пишем маркер
 
                         # 2.2 поворот в массиве
                         rotate_part(ring, part_mas, puzzle_arch, radians(angle_rotate), direction)
@@ -281,29 +298,42 @@ def main():
 
                 # отрисовка частей
                 for nn,part in enumerate(puzzle_parts):
-                    if part[1]>=0: # отрицательные цвета для скрытых частей
-                        pygame.draw.polygon(game_scr,PARTS_COLOR[part[1]],part[3],0)
-                    pygame.draw.polygon(game_scr,BLACK_COLOR,part[3],COUNTUR)
+                    if part[2]>0:
+                        pygame.draw.polygon(game_scr,PARTS_COLOR[part[1]],part[7],0)
+                    pygame.draw.polygon(game_scr,BLACK_COLOR,part[7],COUNTUR)
 
                 # отрисовка выделения
                 if ring_select>0:
                     ring = find_element(ring_select, puzzle_rings)
                     pygame.draw.circle(game_scr,WHITE_COLOR, (ring[1],ring[2]),ring[3]+5,3)
 
-                # рисуем авто-маркеры
-                if auto_marker:
-                    for nn, part in enumerate(puzzle_parts):
-                        center_x, center_y = calc_centroid(part[4])
-                        text_marker = font_marker.render(str(part[0]), True, BLACK_COLOR if part[1]!=1 else WHITE_COLOR)
-                        text_marker_place = text_marker.get_rect(center=(center_x, center_y))
-                        game_scr.blit(text_marker, text_marker_place)  # Пишем маркет
+                # рисуем маркеры
+                for nn, part in enumerate(puzzle_parts):
+                    marker_sprite = ""
+                    marker_color = BLACK_COLOR if part[1] != 1 else WHITE_COLOR
+                    center_x, center_y, area = part[4]
+                    if auto_marker:
+                        marker_sprite, _ = ptext.draw(str(part[0]), (0, 0), color=marker_color, fontsize=10, sysfontname='Verdana', align="center")
+                    elif len(part[3])!=0:
+                        marker_text, marker_angle, marker_size, marker_horizontal_shift, marker_vertical_shift, marker_sprite = part[3]
+                        center_x -= marker_vertical_shift*puzzle_scale
+                        center_y -= marker_horizontal_shift*puzzle_scale
+                        if marker_sprite=="":
+                            if marker_size==0:
+                                marker_size = int(area/200)
+                            marker_sprite, _ = ptext.draw(marker_text, (marker_vertical_shift*puzzle_scale, marker_horizontal_shift*puzzle_scale), color=marker_color, fontsize=marker_size, sysfontname='Verdana', align="center")
+                            part[3][5] = marker_sprite
+                        marker_sprite = pygame.transform.rotate(marker_sprite, marker_angle)
+                    if marker_sprite!="":
+                        text_marker_place = marker_sprite.get_rect(center=(center_x, center_y))
+                        game_scr.blit(marker_sprite, text_marker_place)  # Пишем маркер
                 if auto_marker_ring:
                     for nn, ring in enumerate(puzzle_rings):
                         if ring[6]!=0: continue
                         center_x, center_y = ring[1],ring[2]
-                        text_marker = font_marker_ring.render(str(ring[0]), True, RED_COLOR)
+                        text_marker, _ = ptext.draw(str(ring[0]), (0, 0), color=RED_COLOR, fontsize=20, sysfontname='Verdana', align="center", owidth=1, ocolor="blue")
                         text_marker_place = text_marker.get_rect(center=(center_x, center_y))
-                        game_scr.blit(text_marker, text_marker_place)  # Пишем маркет
+                        game_scr.blit(text_marker, text_marker_place)  # Пишем маркер
 
                 screen.blit(game_scr, (0, 0))
 

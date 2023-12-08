@@ -14,13 +14,14 @@ def sign(x):
         return -1
 
 def find_element(pos, mas):
-    # поиск элемента массива по номеру
+    # поиск элемента массива по номеру (индекс в первой ячейке)
     for elem in mas:
         if elem[0] == pos:
             return elem
     return ""
 
 def mas_pos(mas_xy, pos):
+    # получить элемент массива независимо от выхода индекса за границы
     ll = len(mas_xy)
     while pos >= ll:
         pos -= ll
@@ -67,6 +68,7 @@ def calc_len_polygon(polygon):
     return len_line
 
 def calc_area_polygon(polygon):
+    # вычисление площади полигона
     area = 0
     for count in range(-1, len(polygon) - 1):
         y = polygon[count + 1][1] + polygon[count][1]
@@ -107,10 +109,14 @@ def check_polygon(polygon, x, y):
         j = i
     return odd, length
 
-def check_circle(center_x, center_y, x, y, rad):
-    # проверка попадает ли точка внутрь окружности
+def check_line(x1, y1, x2, y2, center_x, center_y):
+    return compare_xy( (center_y-y1)*(x2-x1), (center_x-x1)*(y2-y1), 4)
+
+def check_circle(center_x, center_y, x, y, rad, nn=2):
+    # проверка попадает ли точка внутрь окружности, лежит ли она на окружности с небольшой погрешностью
     length = calc_length(center_x, center_y, x, y)
-    return (length<=rad, length/rad)
+    in_ring = length/rad if rad != 0 else 0
+    return (length<=rad, compare_xy(in_ring, 1, nn), in_ring)
 
 def rotate_point(center_x, center_y, x, y, angle):
     # поворот точки относительно центра координат по часовой стрелке
@@ -150,7 +156,6 @@ def circles_intersect(x1,y1,r1,x2,y2,r2):
         x = (-m-dd) / (2*k)
         y = p - q*x
         inter.append( (round(x+x1,10),round(y+y1,10)) )
-        return inter
 
     else:
         x = (x2*x2-r2*r2+r1*r1)/(2*x2)
@@ -168,10 +173,67 @@ def circles_intersect(x1,y1,r1,x2,y2,r2):
         inter.append( (round(x+x1,10),round(y+y1,10)) )
         y = -dd
         inter.append( (round(x+x1,10),round(y+y1,10)) )
-        return inter
 
-def len_puzzle_rings(puzzle_rings):
-    len_puzzle_rings = 0
-    for ring in puzzle_rings:
-        if ring[6] == 0: len_puzzle_rings += 1
-    return len_puzzle_rings
+    if len(inter)==2:
+        length = calc_length(inter[0][0],inter[0][1],inter[1][0],inter[1][1])
+        if compare_xy(length,0,4):
+            inter.pop(1)
+
+    return inter
+
+def check_point_in_arch(p1x, p1y, p2x, p2y, ax, ay, cx, cy, anti):
+    # проверяет попадает ли точка внутрь дуги
+    x1, y1 = p1x - cx, p1y - cy
+    x2, y2 = p2x - cx, p2y - cy
+    xa, ya = ax - cx, ay - cy
+    if anti==-1:
+        x1, y1, x2, y2 = x2, y2, x1, y1
+
+    rad = calc_length(0, 0, xa, ya)
+    ang1, ang1deg = calc_angle(0,0, x1,y1, rad)
+    ang2, ang2deg = calc_angle(0,0, x2,y2, rad)
+    anga, angadeg = calc_angle(0,0, xa,ya, rad)
+
+    delta, deltadeg = ang2, ang2deg
+    ang1, ang1deg = ang1-delta, ang1deg-deltadeg
+    ang2, ang2deg = ang2-delta, ang2deg-deltadeg
+    anga, angadeg = anga-delta, angadeg-deltadeg
+
+    if ang1<0: ang1, ang1deg = ang1+2*pi, ang1deg+360
+    if anga<0: anga, angadeg = anga+2*pi, angadeg+360
+
+    if anga>=ang2 and anga<=ang1: return True
+
+    return False
+
+def calc_center_arch(x1, y1, x3, y3, arch_x, arch_y, arch_r, direction=1):
+    angle1, grad1 = calc_angle(arch_x, arch_y, x1, y1, arch_r)
+    angle3, grad3 = calc_angle(arch_x, arch_y, x3, y3, arch_r)
+
+    if (angle1 < angle3 and direction == 1) or (angle1 > angle3 and direction == -1):
+        angle2, grad2 = (angle1 + angle3 - 2 * pi) / 2, (grad1 + grad3 - 360) / 2
+    else:
+        angle2, grad2 = (angle1 + angle3) / 2, (grad1 + grad3) / 2
+
+    angle_cos, angle_sin = cos(angle2), sin(angle2)
+    x2, y2 = angle_cos * arch_r + arch_x, angle_sin * arch_r + arch_y
+    return x2, y2
+
+def find_angle_direction(p2x, p2y, p1x, p1y, cx, cy):
+    # возвращает направление движения дуги. по часовой или против часовой стрелки. для углов <= 180гр
+    x1, y1 = p1x - cx, p1y - cy
+    x2, y2 = p2x - cx, p2y - cy
+    s12 = sign(x1 * y2 - y1 * x2)
+    return 1 if s12>=0 else -1
+
+def get_command(cut_command):
+    command = cut_command.upper()
+    pos = command.find("R")
+    pos = pos if pos >= 0 else command.find("L")
+    if pos < 0 or len(command) < 2: return 0, 0, 0
+
+    num_ring = int(command[0:pos])
+    direction = 1 if command[pos].upper() == "R" else -1 if command[pos].upper() == "L" else 0
+    if direction == 0: return 0, 0, 0
+    step = 1 if len(command) == pos + 1 else int(command[pos + 1:])
+    return num_ring, direction, step

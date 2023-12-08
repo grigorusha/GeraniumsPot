@@ -1,5 +1,8 @@
 import win32gui
 from tkinter import Tk
+import os
+
+import pygame
 
 def window_front(win_caption):
     def windowEnumerationHandler(hwnd, windows):
@@ -64,3 +67,27 @@ def calc_param(elem, param_calc):
 
     return elem
 
+def find_photo(puzzle_name, PHOTO):
+    photo_screen, photo_path = "", ""
+    dir = os.path.abspath(os.curdir) + "\\Photo"
+    if os.path.isdir(dir):
+        for root, dirs, files in os.walk(dir):
+            for fil in files:
+                if (fil.lower() == puzzle_name.lower() + ".jpg") or (fil.lower() == puzzle_name.lower() + ".png"):
+                    photo_path = root + "\\" + fil
+                    break
+            if photo_path != "": break
+        if os.path.isfile(photo_path):
+            photo_screen = pygame.image.load(photo_path)
+            photo_rect = (photo_screen.get_rect().width, photo_screen.get_rect().height)
+            if photo_rect[0] / photo_rect[1] <= PHOTO[0] / PHOTO[1]:
+                scale_ko = PHOTO[1] / photo_rect[1]
+                new_width = int(scale_ko * photo_rect[0])
+                PHOTO = (new_width, PHOTO[1])
+            else:
+                scale_ko = PHOTO[0] / photo_rect[0]
+                new_height = int(scale_ko * photo_rect[1])
+                PHOTO = (PHOTO[0], new_height)
+
+            photo_screen = pygame.transform.scale(photo_screen, PHOTO)
+    return photo_screen, PHOTO
