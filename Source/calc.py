@@ -132,10 +132,30 @@ def circles_intersect(x1,y1,r1,x2,y2,r2):
     if compare_xy(x1,x2,8) and compare_xy(y1,y2,8):
         return []
 
+    dist = calc_length(x1,y1,x2,y2)
+    if not compare_xy(dist,r1+r2,8):
+        if dist>(r1+r2): return []
+
     inter = []
     x2,y2 = round(x2-x1,10),round(y2-y1,10)
 
-    if y2 != 0:
+    if compare_xy(y2,0,8):
+        x = (x2*x2-r2*r2+r1*r1)/(2*x2)
+        d = r1*r1-x*x
+
+        if compare_xy(d,0,8):
+            y = 0
+            inter.append( (round(x+x1,10),round(y+y1,10)) )
+            return inter
+        if d < 0:
+            return inter
+        dd = sqrt(d)
+
+        y = dd
+        inter.append( (round(x+x1,10),round(y+y1,10)) )
+        y = -dd
+        inter.append( (round(x+x1,10),round(y+y1,10)) )
+    else:
         p = (x2*x2+y2*y2-r2*r2+r1*r1)/(2*y2)
         q = x2/y2
         k,m,n = q*q+1, -2*p*q, p*p-r1*r1
@@ -155,23 +175,6 @@ def circles_intersect(x1,y1,r1,x2,y2,r2):
         inter.append( (round(x+x1,10),round(y+y1,10)) )
         x = (-m-dd) / (2*k)
         y = p - q*x
-        inter.append( (round(x+x1,10),round(y+y1,10)) )
-
-    else:
-        x = (x2*x2-r2*r2+r1*r1)/(2*x2)
-        d = r1*r1-x*x
-
-        if compare_xy(d,0,8):
-            y = 0
-            inter.append( (round(x+x1,10),round(y+y1,10)) )
-            return inter
-        if d < 0:
-            return inter
-        dd = sqrt(d)
-
-        y = dd
-        inter.append( (round(x+x1,10),round(y+y1,10)) )
-        y = -dd
         inter.append( (round(x+x1,10),round(y+y1,10)) )
 
     if len(inter)==2:
