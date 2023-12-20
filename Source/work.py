@@ -132,192 +132,6 @@ def expand_script(lines):
 
     return command_mas
 
-def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
-    flip_y = flip_x = flip_rotate = skip_check_error = False
-    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker, auto_marker_ring, first_cut = "", "", 1, 2, 0, 0, True
-    puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts, copy_parts = [], [], [], [], [], [], [], [], []
-    part_num, param_calc, ring_num = 0, [], 1
-
-    command_mas = expand_script(lines)
-
-    step,step_total = 0,1
-    for command, params, param_mas, _ in command_mas:
-        if ["Ring","CopyRing","Renumbering","AutoColorParts","SetColorParts","SetMarkerParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts","HideAllParts","ShowAllParts","InvertAllParts"].count(command)>0:
-            step_total += 1
-        elif ["MakeCircles","CutCircles","RemoveParts","HideParts","ShowParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts"].count(command)>0:
-            step_total += len(param_mas)
-        elif ["AutoCutParts","CopyParts","MoveParts"].count(command)>0:
-            step_total += len(param_mas)
-
-    ##################################################################
-    # инициализация параметров
-
-    for command, params, param_mas, str_nom in command_mas:
-        if ["Ring","CopyRing","Renumbering","AutoColorParts","SetColorParts","SetMarkerParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts","HideAllParts","ShowAllParts","InvertAllParts"].count(command)>0:
-            step += 1
-        elif ["MakeCircles","CutCircles","RemoveParts","HideParts","ShowParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts"].count(command)>0:
-            step += len(param_mas)
-        elif ["AutoCutParts","CopyParts","MoveParts"].count(command)>0:
-            step += len(param_mas)
-
-        percent = int(100 * step / step_total)
-        if percent%5==0 and percent!=0:
-            try:
-                display.set_caption(puzzle_name + ": Please wait! Loading ... " + str(percent) + "%")
-                display.update()
-            except: pass
-
-        if command == "Name":
-            puzzle_name = params
-        elif command == "Author":
-            puzzle_author = params
-        elif command == "SkipCheckError":
-            if int(params) == 1:
-                skip_check_error = True
-        elif command == "Link":
-            puzzle_link.append(params)
-        elif command == "Scale":
-            puzzle_scale = float(params)
-        elif command == "Speed":
-            puzzle_speed = float(params)
-        elif command == "Flip":
-            if params.lower().find("y") >= 0:
-                flip_y = True
-            if params.lower().find("x") >= 0:
-                flip_x = True
-            if params.lower().find("rotate") >= 0:
-                flip_rotate = True
-
-        #########################################################################
-        elif command == "Param":
-            if len(param_mas) != 2: return ("Incorrect 'Param' parameters. In str=" + str(str_nom))
-            for param in param_calc:
-                if param_mas[1].find(param[0]) != -1:
-                    param_mas[1] = param_mas[1].replace(param[0], str(param[1]))
-            try:
-                param_mas[1] = eval(param_mas[1])
-            except:
-                return ("Error in 'Param' calculation. In str=" + str(str_nom))
-            param_calc.append([param_mas[0], param_mas[1]])
-
-        #########################################################################
-        # инициализация кругов головоломки
-        elif command == "Ring":
-            if not (len(param_mas) == 5 or len(param_mas) == 6): return ("Incorrect 'Ring' parameters. In str=" + str(str_nom))
-            param_mas[1], param_mas[2] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc)
-            param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
-            param_mas5 = param_mas[5] if len(param_mas)==6 else 0
-            puzzle_rings.append([ring_num, param_mas[1], param_mas[2], param_mas[3], param_mas[4], 0, param_mas5])
-            ring_num += 1
-
-            arch_num = len(puzzle_arch)+1
-            puzzle_arch.append([arch_num, param_mas[1], param_mas[2], param_mas[3]])
-
-        elif command == "CopyRing":
-            if not (len(param_mas) == 5 or len(param_mas) == 6): return ("Incorrect 'CopyRing' parameters. In str=" + str(str_nom))
-            param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
-            param_mas5 = param_mas[5] if len(param_mas)==6 else 0
-            center_x, center_y = copy_ring(int(param_mas[1]),param_mas[2],puzzle_rings)
-            puzzle_rings.append([ring_num, center_x, center_y, param_mas[3], param_mas[4], 0, param_mas5])
-            ring_num += 1
-
-            arch_num = len(puzzle_arch)+1
-            puzzle_arch.append([arch_num, center_x, center_y, param_mas[3]])
-
-        ###############################################################################################################################
-        # инициализация всех частей. запускаем скрамбл функцию с одновременной нарезкой. запускаем авто раскраску со смешиванием цветов
-
-        elif command == "AutoCutParts":
-            auto_cut_parts = param_mas
-            init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, first_cut)
-            first_cut = False
-
-        elif command == "MakeCircles":
-            make_circles = param_mas
-            make_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, make_circles)
-            first_cut = False
-
-        elif command == "CutCircles":
-            cut_circles = param_mas
-            cut_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, cut_circles)
-
-        elif command == "RemoveParts":
-            remove_parts = param_mas
-            remove_def_parts(puzzle_parts, remove_parts)
-
-        elif command == "RemoveMicroParts" or command == "RemoveSmallParts":
-            area_param = param_mas
-            remove_micro_parts(puzzle_parts, area_param)
-
-        elif command == "CopyParts":
-            copy_parts = param_mas
-            copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts)
-        elif command == "MoveParts":
-            copy_parts = param_mas
-            copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts, True)
-
-        elif command == "Renumbering":
-            sort_and_renum_all_parts(puzzle_parts)
-
-        elif command == "HideParts":
-            hide_parts = param_mas
-            hide_show_def_parts(puzzle_parts, hide_parts, -1, False)
-        elif command == "ShowParts":
-            hide_parts = param_mas
-            hide_show_def_parts(puzzle_parts, hide_parts, 1, False)
-        elif command == "HideAllParts":
-            hide_show_def_parts(puzzle_parts, [], -1, True)
-        elif command == "ShowAllParts":
-            hide_show_def_parts(puzzle_parts, [], 1, True)
-        elif command == "InvertAllParts":
-            hide_show_def_parts(puzzle_parts, [], 0, True)
-
-        elif command == "RotateAllParts":
-            param_mas[0], param_mas[1], param_mas[2] = calc_param(param_mas[0], param_calc), calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc)
-            rotate_parts_param = param_mas
-            rotate_all_parts(puzzle_rings, puzzle_arch, puzzle_parts, rotate_parts_param)
-
-        elif command == "AutoColorParts":
-            auto_color_parts = param_mas
-            init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, PARTS_COLOR)
-        elif command == "SetColorParts":
-            set_color_parts = param_mas
-            set_color_all_parts(puzzle_parts, set_color_parts)
-
-        elif command == "SetMarkerParts":
-            set_marker_parts = param_mas
-            set_marker_all_parts(puzzle_parts, set_marker_parts, puzzle_scale)
-        elif command == "AutoMarker":
-            auto_marker = int(params) if is_number(params) else 1
-        elif command == "AutoMarkerRing":
-            auto_marker_ring = int(params) if is_number(params) else 1
-
-        elif command == "End" or command == "Stop" or command == "Exit" or command == "Quit":
-            break
-
-        ########################################################################################
-        # блок для загрузки скомпилированной головоломки. загружаем координаты всех частей
-        elif command == "Arch":
-            if len(param_mas) != 4: return ("Incorrect 'Arch' parameters. In str=" + str(str_nom))
-            param_mas[1], param_mas[2], param_mas[3] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc), calc_param(param_mas[3], param_calc)
-            puzzle_arch.append([int(param_mas[0]), param_mas[1], param_mas[2], param_mas[3]])
-        elif command == "Part":
-            if len(param_mas) == 2:
-                part_num = int(param_mas[0])
-                puzzle_parts.append([part_num, int(param_mas[1]), 1, [], [], [], [], []])
-            else:
-                return ("Incorrect 'Part' parameters. In str=" + str(str_nom))
-        elif command == "PartArch":
-            if len(param_mas) == 4 and part_num > 0:
-                part = find_element(part_num, puzzle_parts)
-                param_mas[2], param_mas[3] = calc_param(param_mas[2], param_calc), calc_param(param_mas[3], param_calc)
-                part_arch = part[5]
-                part_arch.append([int(param_mas[0]), 1, int(param_mas[1]), param_mas[2], param_mas[3], 0])
-            else:
-                return ("Incorrect 'PartArch' parameters. In str=" + str(str_nom))
-
-    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, auto_marker_ring, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error
-
 def align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip_x, flip_y, flip_rotate, BORDER):
     # выровняем относительно осей. чтобы не было сильных сдвигов
     for nn, ring in enumerate(puzzle_rings):
@@ -353,6 +167,9 @@ def align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, flip
             for part_arch in part[5]:
                 part_arch[3] = part_arch[3] * puzzle_scale + shift
                 part_arch[4] = part_arch[4] * puzzle_scale + shift
+            if len(part[3])>0:
+                part[3][3] = part[3][3] * puzzle_scale
+                part[3][4] = part[3][4] * puzzle_scale
 
     # иногда контуры колец выходят за край
     min_x = min_y = 0
@@ -750,6 +567,197 @@ def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN
     fil2 = fl_break, fl_reset, file_ext, fl_resize, BTN_CLICK, BTN_CLICK_STR, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, mouse_xx, mouse_yy
     return fil, fil2
 
+def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
+    flip_y = flip_x = flip_rotate = skip_check_error = False
+    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker, auto_marker_ring, first_cut = "", "", 1, 2, 0, 0, True
+    puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts, copy_parts = [], [], [], [], [], [], [], [], []
+    part_num, param_calc, ring_num = 0, [], 1
+
+    command_mas = expand_script(lines)
+
+    step,step_total = 0,1
+    for command, params, param_mas, _ in command_mas:
+        if ["Ring","CopyRing","Renumbering","AutoColorParts","SetColorCircles","SetColorParts","SetMarkerParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts","HideAllParts","ShowAllParts","InvertAllParts"].count(command)>0:
+            step_total += 1
+        elif ["MakeCircles","CutCircles","RemoveParts","HideParts","ShowParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts"].count(command)>0:
+            step_total += len(param_mas)
+        elif ["AutoCutParts","CopyParts","MoveParts"].count(command)>0:
+            step_total += len(param_mas)
+
+    ##################################################################
+    # инициализация параметров
+
+    for command, params, param_mas, str_nom in command_mas:
+        if ["Ring","CopyRing","Renumbering","AutoColorParts","SetColorCircles","SetColorParts","SetMarkerParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts","HideAllParts","ShowAllParts","InvertAllParts"].count(command)>0:
+            step += 1
+        elif ["MakeCircles","CutCircles","RemoveParts","HideParts","ShowParts","RotateAllParts","RemoveMicroParts","RemoveSmallParts"].count(command)>0:
+            step += len(param_mas)
+        elif ["AutoCutParts","CopyParts","MoveParts"].count(command)>0:
+            step += len(param_mas)
+
+        percent = int(100 * step / step_total)
+        if percent%5==0 and percent!=0:
+            try:
+                display.set_caption(puzzle_name + ": Please wait! Loading ... " + str(percent) + "%")
+                display.update()
+            except: pass
+
+        if command == "Name":
+            puzzle_name = params
+        elif command == "Author":
+            puzzle_author = params
+        elif command == "SkipCheckError":
+            if int(params) == 1:
+                skip_check_error = True
+        elif command == "Link":
+            puzzle_link.append(params)
+        elif command == "Scale":
+            puzzle_scale = float(params)
+        elif command == "Speed":
+            puzzle_speed = float(params)
+        elif command == "Flip":
+            if params.lower().find("y") >= 0:
+                flip_y = True
+            if params.lower().find("x") >= 0:
+                flip_x = True
+            if params.lower().find("rotate") >= 0:
+                flip_rotate = True
+
+        #########################################################################
+        elif command == "Param":
+            if len(param_mas) != 2: return ("Incorrect 'Param' parameters. In str=" + str(str_nom))
+            for param in param_calc:
+                if param_mas[1].find(param[0]) != -1:
+                    param_mas[1] = param_mas[1].replace(param[0], str(param[1]))
+            try:
+                param_mas[1] = eval(param_mas[1])
+            except:
+                return ("Error in 'Param' calculation. In str=" + str(str_nom))
+            param_calc.append([param_mas[0], param_mas[1]])
+
+        #########################################################################
+        # инициализация кругов головоломки
+        elif command == "Ring":
+            if not (len(param_mas) == 5 or len(param_mas) == 6): return ("Incorrect 'Ring' parameters. In str=" + str(str_nom))
+            param_mas[1], param_mas[2] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc)
+            param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
+            param_mas5 = param_mas[5] if len(param_mas)==6 else 0
+            puzzle_rings.append([ring_num, param_mas[1], param_mas[2], param_mas[3], param_mas[4], 0, param_mas5, [], []])
+            ring_num += 1
+
+            arch_num = len(puzzle_arch)+1
+            puzzle_arch.append([arch_num, param_mas[1], param_mas[2], param_mas[3]])
+            check_all_rings(puzzle_rings)
+
+        elif command == "CopyRing":
+            if not (len(param_mas) == 5 or len(param_mas) == 6): return ("Incorrect 'CopyRing' parameters. In str=" + str(str_nom))
+            param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
+            param_mas5 = param_mas[5] if len(param_mas)==6 else 0
+            center_x, center_y = copy_ring(int(param_mas[1]),param_mas[2],puzzle_rings)
+            puzzle_rings.append([ring_num, center_x, center_y, param_mas[3], param_mas[4], 0, param_mas5, [], []])
+            ring_num += 1
+
+            arch_num = len(puzzle_arch)+1
+            puzzle_arch.append([arch_num, center_x, center_y, param_mas[3]])
+            check_all_rings(puzzle_rings)
+
+        ###############################################################################################################################
+        # инициализация всех частей. запускаем скрамбл функцию с одновременной нарезкой. запускаем авто раскраску со смешиванием цветов
+
+        elif command == "AutoCutParts":
+            auto_cut_parts = param_mas
+            init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, first_cut)
+            first_cut = False
+
+        elif command == "MakeCircles":
+            make_circles = param_mas
+            make_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, make_circles)
+            first_cut = False
+
+        elif command == "CutCircles":
+            cut_circles = param_mas
+            cut_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, cut_circles)
+
+        elif command == "RemoveParts":
+            remove_parts = param_mas
+            remove_def_parts(puzzle_parts, remove_parts)
+
+        elif command == "RemoveMicroParts" or command == "RemoveSmallParts":
+            area_param = param_mas
+            remove_micro_parts(puzzle_parts, area_param)
+
+        elif command == "CopyParts":
+            copy_parts = param_mas
+            copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts)
+        elif command == "MoveParts":
+            copy_parts = param_mas
+            copy_def_parts(copy_parts, puzzle_rings, puzzle_arch, puzzle_parts, True)
+
+        elif command == "Renumbering":
+            sort_and_renum_all_parts(puzzle_parts)
+
+        elif command == "HideParts":
+            hide_parts = param_mas
+            hide_show_def_parts(puzzle_parts, hide_parts, -1, False)
+        elif command == "ShowParts":
+            hide_parts = param_mas
+            hide_show_def_parts(puzzle_parts, hide_parts, 1, False)
+        elif command == "HideAllParts":
+            hide_show_def_parts(puzzle_parts, [], -1, True)
+        elif command == "ShowAllParts":
+            hide_show_def_parts(puzzle_parts, [], 1, True)
+        elif command == "InvertAllParts":
+            hide_show_def_parts(puzzle_parts, [], 0, True)
+
+        elif command == "RotateAllParts":
+            param_mas[0], param_mas[1], param_mas[2] = calc_param(param_mas[0], param_calc), calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc)
+            rotate_parts_param = param_mas
+            rotate_all_parts(puzzle_rings, puzzle_arch, puzzle_parts, rotate_parts_param)
+
+        elif command == "AutoColorParts":
+            auto_color_parts = param_mas
+            init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, PARTS_COLOR)
+        elif command == "SetColorCircles":
+            auto_color_parts = param_mas
+            init_color_all_circles(puzzle_parts, puzzle_rings, auto_color_parts)
+        elif command == "SetColorParts":
+            set_color_parts = param_mas
+            set_color_all_parts(puzzle_parts, set_color_parts)
+
+        elif command == "SetMarkerParts":
+            set_marker_parts = param_mas
+            set_marker_all_parts(puzzle_parts, set_marker_parts, puzzle_scale)
+        elif command == "AutoMarker":
+            auto_marker = int(params) if is_number(params) else 1
+        elif command == "AutoMarkerRing":
+            auto_marker_ring = int(params) if is_number(params) else 1
+
+        elif command == "End" or command == "Stop" or command == "Exit" or command == "Quit":
+            break
+
+        ########################################################################################
+        # блок для загрузки скомпилированной головоломки. загружаем координаты всех частей
+        elif command == "Arch":
+            if len(param_mas) != 4: return ("Incorrect 'Arch' parameters. In str=" + str(str_nom))
+            param_mas[1], param_mas[2], param_mas[3] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc), calc_param(param_mas[3], param_calc)
+            puzzle_arch.append([int(param_mas[0]), param_mas[1], param_mas[2], param_mas[3]])
+        elif command == "Part":
+            if len(param_mas) == 2:
+                part_num = int(param_mas[0])
+                puzzle_parts.append([part_num, int(param_mas[1]), 1, [], [], [], [], []])
+            else:
+                return ("Incorrect 'Part' parameters. In str=" + str(str_nom))
+        elif command == "PartArch":
+            if len(param_mas) == 4 and part_num > 0:
+                part = find_element(part_num, puzzle_parts)
+                param_mas[2], param_mas[3] = calc_param(param_mas[2], param_calc), calc_param(param_mas[3], param_calc)
+                part_arch = part[5]
+                part_arch.append([int(param_mas[0]), 1, int(param_mas[1]), param_mas[2], param_mas[3], 0])
+            else:
+                return ("Incorrect 'PartArch' parameters. In str=" + str(str_nom))
+
+    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, auto_color_parts, auto_marker, auto_marker_ring, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error
+
 def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     # загрузка файла
     lines, puzzle_kol, dirname, filename, error_str = load_puzzle(fl, init, dirname, filename)
@@ -775,6 +783,11 @@ def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
 
     for ring in puzzle_rings:
         ring[5]=0 # сбросим углы поворота для бермуд
+
+        # вычисление плавного контура кругов
+        shift = 4
+        arch_mas = [[ring[1], ring[2] + ring[3] + shift], [ring[1], ring[2] + ring[3] + shift]]
+        ring[8], _ = calc_arch_spline(arch_mas, ring[1], ring[2], ring[3] + shift, 1)
 
     mouse.set_cursor(SYSTEM_CURSOR_ARROW)
     if typeof(win_caption)=="str":

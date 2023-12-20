@@ -3,6 +3,34 @@ from tkinter import Tk
 import os
 
 import pygame
+from math import hypot
+from calc import mas_pos
+
+def draw_smoth_polygon(surface, color, polygon, width):
+    # рисуем плавную кривую с пиксельным сглаживанием
+    # заменяем pygame.draw.polygon - тк там грубая пиксельная ступенька
+    for nn, p1 in enumerate(polygon):
+        p2 = mas_pos(polygon, nn + 1)
+
+        # delta vector
+        d = (p2[0] - p1[0], p2[1] - p1[1])
+        # distance between the points
+        dis = hypot(*d)
+        # scaled perpendicular vector (vector from p1 & p2 to the polygon's points)
+        if dis != 0:
+            sp = (-d[1] * width / (2 * dis), d[0] * width / (2 * dis))
+        else:
+            sp = (0,0)
+
+        # points
+        p1_1 = (p1[0] - sp[0], p1[1] - sp[1])
+        p1_2 = (p1[0] + sp[0], p1[1] + sp[1])
+        p2_1 = (p2[0] - sp[0], p2[1] - sp[1])
+        p2_2 = (p2[0] + sp[0], p2[1] + sp[1])
+
+        # draw two line
+        pygame.draw.aaline(surface, color, p1_1, p1_2, 1)
+        pygame.draw.aaline(surface, color, p2_1, p2_2, 1)
 
 def window_front(win_caption):
     def windowEnumerationHandler(hwnd, windows):

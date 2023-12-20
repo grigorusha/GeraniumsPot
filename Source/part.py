@@ -5,15 +5,21 @@ from pygame import *
 
 import copy
 import random
-from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians, degrees
+from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians, degrees, hypot
 
 # puzzle_rings, puzzle_arch, puzzle_parts - формат массивов:
 
-# puzzle_rings - [ring_num, center_x, center_y, radius, angle_deg, _ , type]
-#              - [ring_num, center_x, center_y, radius, (angle_deg1,angle_deg2,...), jumble_angle_pos, type] - angle_deg1+angle_deg2+..=360 deg, jumble_angle_pos = 0,1,..
+# puzzle_rings - [ring_num, center_x, center_y, radius, angle_deg, _pos , type, [linked], [mas_spline]]
+#                        0         1         2       3          4  5         6        7             8
+#              - [ring_num, center_x, center_y, radius, (angle_deg1,angle_deg2,...), jumble_angle_pos, type, [linked], [mas_spline]]
+#                   - angle_deg1+angle_deg2+..=360 deg, jumble_angle_pos = 0,1,..
 #       (круги создаются в процедуре: work.read_puzzle_script_and_init_puzzle)
 #              для головоломок с некратными углами, в параметре Angle массив углов, а также позиция текущего угла поворота всего круга.
-#              type - 0 это стандартный кольца, 1 это вспомогательные кольца для нарезки, собственных частей не имеют, как контуры не отображаем
+#              type - 0 это стандартные кольца, 1 это вспомогательные кольца для нарезки, собственных частей не имеют, как контуры не отображаем
+#                   - 2 зафиксированые вложенные кольца, части внутри них не поворачиваются
+#              linked - [ring_num, link_type] - массив вложенных крэйзи-колец, для связанного вращения или для разделения вращения колец
+#                   link_type - 0 не связанные кольца, 1 связаны
+#               mas_spline - [ [x0,y0],[x1,y1],..,[xm,ym] ] - плавный сплайн для отрисовки контура круга
 
 # puzzle_arch  - [arch_num, center_x, center_y, radius]
 #       (арки создаются в процедурах: make_def_circles, rotate_part,    work.read_puzzle_script_and_init_puzzle)
@@ -22,7 +28,7 @@ from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians, d
 # puzzle_parts - [part_num, color_index, visible, [marker], [centroid], [mas_arch_lines], [mas_polygon], [mas_spline]]
 #                        0            1        2        3           4                 5              6             7
 #       (части создаются в процедурах: make_def_circles, cut_parts_in_ring, copy_def_parts,    work.read_puzzle_script_and_init_puzzle)
-#       marker - [text, angle, font_size, sprite]
+#       marker - [text, angle, font_size, horizontal_shift, vertical_shift, sprite]
 #       centroid - [center_x, center_y, area]
 #       mas_arch_lines - [ [part_arch1],[part_arch2],.. ]
 #           part_arch - [arch_num, type, direction, start_x, start_y, fl]
@@ -37,11 +43,33 @@ from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians, d
 
 # puzzle_areas - [area_num, [mas_lines]]
 
+
+
+# def find_incorrect_parts(puzzle_parts, puzzle_arch):
+#     calc_parts_countur(puzzle_parts, puzzle_arch)
+#
+#     # поиск накладывающихся друг на друга кусочков
+#     for nn,part1 in enumerate(puzzle_parts):
+#         count_in = count_out = 0
+#         for mm, part2 in enumerate(puzzle_parts[nn+1:]):
+#             for x,y in part1[6]:
+#                 fl_pol, _ = check_polygon(part2[7], x, y)
+#                 if count_in:
+#                     count_in += 1
+#                 else:
+#                     count_out += 1
+#                 if count_in>0 and count_out>0:
+#                     break
+#
+
+
 def rotate_part(ring, part_mas, puzzle_arch, angle, direction):
     # поворот всех частей из массива относительно центра круга
     for part in part_mas:
         if len(part[3])>0:
             part[3][1] += degrees(angle)*-direction
+            part[3][3],part[3][4] = rotate_point(0, 0, part[3][3],part[3][4], angle*-direction)
+
         if len(part[4])>0:
             part[4][0], part[4][1] = rotate_point(ring[1], ring[2], part[4][0], part[4][1], angle*-direction)
 
@@ -68,46 +96,6 @@ def len_puzzle_rings(puzzle_rings):
     for ring in puzzle_rings:
         if ring[6] == 0: len_puzzle_rings += 1
     return len_puzzle_rings
-
-def calc_arch_spline(arch_mas, arch_x, arch_y, arch_r, direction, max_iter = 0):
-    # расчет всех точек сплайна для полигона. max_iter - дает возможность поcчитать только грубое приближение
-    fl_error = False
-    step = 1
-    input_xy = arch_mas.copy()
-    fl_iter, iter = True, 0
-    while fl_iter:
-        fl_iter, iter = False, iter + 1
-        mas_xy, len_mas = [], len(input_xy) - 1
-        for nn in range(len_mas):
-            mas_xy.append([input_xy[nn][0], input_xy[nn][1]])
-
-            x1, y1 = mas_pos(input_xy, nn)
-            x3, y3 = mas_pos(input_xy, nn + 1)
-
-            len_vek = calc_length(x1, y1, x3, y3)
-            if iter==1 and x1==x3 and y1==y3:
-                # чистая окружность с одной исходной точкой
-                x2, y2 = (arch_x-x1)+arch_x, (arch_y-y1)+arch_y
-                mas_xy.append([x2, y2])
-                fl_iter = True
-
-            elif len_vek > step:
-                x2, y2 = calc_center_arch(x1, y1, x3, y3, arch_x, arch_y, arch_r, direction)
-
-                mas_xy.append([x2, y2])
-                fl_iter = True
-        mas_xy.append([input_xy[len_mas][0], input_xy[len_mas][1]])
-        input_xy = mas_xy.copy()
-
-        if max_iter>0 and iter>=max_iter:
-            break
-
-        if iter > 100:
-            print("BAD !!!! - "+str(iter))
-            fl_error = True
-            break # иногда уходит в бесконечный цикл... ;(
-
-    return mas_xy, fl_error
 
 def find_part_arch_next(part_arch_mas,nn):
     # возвращает следующую дугу у части по индексу
@@ -152,10 +140,11 @@ def calc_parts_countur(puzzle_parts,puzzle_arch,short_only=False):
             part.append(mas_short_xy)
             part.append(mas_full_xy)
 
-def find_parts_in_circle(ring, puzzle_parts, mode=0):
+def find_parts_in_circle(ring, puzzle_parts, puzzle_rings, mode=0):
     # найдем все части соотносящиеся с кругом, в зависимости от режима выборки
-    # mode : 0 - все части в круге, нет пересечений с кругом, 1 - только части внутри круга,
+    # mode : 0 - все части в круге, нет пересечений с кругом, иначе выходим, 1 - только части внутри круга,
     # 2 - части совпадающие с кругом (все внутри и те что пересекают), 3 - только части пересекающие круг
+    # во всех случаях исключаем части несвязанных вложенных кругов
 
     part_mas, part_mas_other = [], []
     for part in puzzle_parts:
@@ -184,6 +173,18 @@ def find_parts_in_circle(ring, puzzle_parts, mode=0):
         elif fl_part == 2 and mode == 0:
             part_mas = []
             break
+
+    if len(puzzle_rings)>0 and len(ring[7])>0:
+        for linked in ring[7]:
+            if linked[1]==1: continue
+            ring2 = find_element(linked[0],puzzle_rings)
+            part_mas2, _ = find_parts_in_circle(ring2, puzzle_parts, puzzle_rings, 1)
+            for part2 in part_mas2:
+                for nn,part in enumerate(part_mas):
+                    if part2 == part:
+                        part_mas.pop(nn)
+                        break
+
     for part in puzzle_parts:
         if part not in part_mas:
             part_mas_other.append(part)
@@ -192,7 +193,7 @@ def find_parts_in_circle(ring, puzzle_parts, mode=0):
 
 def cut_parts_in_ring(ring, puzzle_arch, puzzle_parts):
     # нарезка контуром окружности всех пересекающих ее частей
-    part_mas, _ = find_parts_in_circle(ring, puzzle_parts, 3)
+    part_mas, _ = find_parts_in_circle(ring, puzzle_parts, [],3)
     arch_ring_num = find_arch(puzzle_arch, ring)
 
     part_new_mas = []
@@ -386,7 +387,7 @@ def init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, PARTS_COL
     if len(auto_color_parts)>len_puzzle_rings(puzzle_rings):
         for ring in puzzle_rings:
             if ring[6] != 0: continue
-            part_mas, _ = find_parts_in_circle(ring, puzzle_parts, 2)
+            part_mas, _ = find_parts_in_circle(ring, puzzle_parts, [], 2)
             for part in part_mas:
                 if part[2]==0: continue
                 if part[1]==0:
@@ -402,7 +403,7 @@ def init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, PARTS_COL
         mm = 0
         for ring in puzzle_rings:
             if ring[6] != 0: continue
-            part_mas, _ = find_parts_in_circle(ring, puzzle_parts, 2)
+            part_mas, _ = find_parts_in_circle(ring, puzzle_parts, [],2)
             for part in part_mas:
                 if part[2]==0: continue
                 if mm >= len(auto_color_parts): break
@@ -421,6 +422,24 @@ def init_color_all_parts(puzzle_parts, puzzle_rings, auto_color_parts, PARTS_COL
                         new_color_ind = len(PARTS_COLOR)-1
                     part[1] = new_color_ind
             mm += 1
+
+def init_color_all_circles(puzzle_parts, puzzle_rings, auto_color_parts):
+    # автоматическая раскраска всех частей внутри заданных кругов. без смешивания цветов
+    for part in puzzle_parts:
+        if part[2] == 0: continue
+        part[1]=0
+
+    while len(auto_color_parts)>1:
+        pos_mas = auto_color_parts.pop(0)
+        color = int(auto_color_parts.pop(0))
+        if typeof(pos_mas)!="list":
+            pos_mas = [pos_mas]
+        for pos in pos_mas:
+            ring = find_element(int(pos),puzzle_rings)
+            part_mas, _ = find_parts_in_circle(ring, puzzle_parts, [], 2)
+            for part in part_mas:
+                if part[2]==0: continue
+                part[1] = color
 
 def set_color_all_parts(puzzle_parts, set_color_parts):
     # раскраска всех заданных частей
@@ -446,15 +465,15 @@ def set_marker_all_parts(puzzle_parts, set_marker_parts, puzzle_scale):
         if marker_text.find("\\n")>=0:
             marker_text = marker_text.replace("\\n","\n")
 
-        marker_part = [ marker_text,0,0,0,0,"" ]
+        marker_part = [ marker_text,0,0,0,0,"" ] # marker_text, marker_angle, marker_size, marker_horizontal_shift, marker_vertical_shift, marker_sprite
         if len(marker)>=3:
-            marker_part[1] = float(marker[2])
+            marker_part[1] = float(marker[2]) # angle
         if len(marker)>=4:
-            marker_part[2] = int(float(marker[3])*puzzle_scale)
+            marker_part[2] = int(float(marker[3])*puzzle_scale) # font size
         if len(marker)>=5:
-            marker_part[3] = int(marker[4])
+            marker_part[3] = int(marker[4]) # marker_horizontal_shift
         if len(marker)>=6:
-            marker_part[4] = int(marker[5])
+            marker_part[4] = int(marker[5]) # marker_vertical_shift
 
         part[3] = marker_part
 
@@ -485,7 +504,7 @@ def find_angle_rotate(ring,direction,freeze=False):
 def turn_ring_and_cut(num_ring, direction, step, puzzle_rings, puzzle_arch, puzzle_parts):
     # повернуть все части внутри круга и запустить нарезку всех пресечений с остальными кругами
     ring1 = find_element(num_ring, puzzle_rings)
-    part_mas, _ = find_parts_in_circle(ring1, puzzle_parts, 1)
+    part_mas, _ = find_parts_in_circle(ring1, puzzle_parts, puzzle_rings, 1)
 
     if typeof(ring1[4])=="list" and step>1:
         for _ in range(step):
@@ -722,8 +741,9 @@ def rotate_all_parts(puzzle_rings, puzzle_arch, puzzle_parts, rotate_parts_param
     for part in puzzle_parts:
         for part_arch in part[5]:
             part_arch[3], part_arch[4] = rotate_point(center_x,center_y, part_arch[3], part_arch[4], -angle)
-        # if len(part[3])>0:
-        #     part[3][1] += -angle_deg
+        if len(part[3])>0:
+            # part[3][1] += -angle_deg
+            part[3][3], part[3][4] = rotate_point(center_x, center_y, part[3][3], part[3][4], -angle)
         if len(part[4]) > 0:
             part[4][0], part[4][1] = rotate_point(center_x, center_y, part[4][0], part[4][1], -angle)
 
@@ -763,7 +783,7 @@ def scramble_puzzle(puzzle_rings,puzzle_arch,puzzle_parts,type):
         ring_num_pred = ring_num
 
         # 1. найдем все части внутри круга
-        part_mas, part_mas_other = find_parts_in_circle(ring, puzzle_parts)
+        part_mas, part_mas_other = find_parts_in_circle(ring, puzzle_parts, puzzle_rings)
         if (part_mas) == 0: continue
 
         # 2. повернем все части внутри круга
@@ -780,6 +800,19 @@ def scramble_puzzle(puzzle_rings,puzzle_arch,puzzle_parts,type):
         display.set_caption(win_caption)
     elif typeof(win_caption)=="list":
         display.set_caption(win_caption[0])
+
+def check_all_rings(puzzle_rings):
+    for nn,ring in enumerate(puzzle_rings):
+        for mm,ring2 in enumerate(puzzle_rings):
+            if nn==mm: continue
+
+            # находим концентрические, но не равные круги
+            if compare_xy(ring[1],ring2[1],8) and compare_xy(ring[2],ring2[2],8) and not compare_xy(ring[3],ring2[3],8):
+                if ring[3]>ring2[3]:
+                    link_type = 0
+                    if ring[4]==ring2[4] and typeof(ring[4])!="list" and ring[6]==ring2[6]:
+                        link_type = 1
+                    ring[7].append( [ring2[0],link_type] )
 
 def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, init=True):
     if init:
@@ -846,7 +879,7 @@ def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut
                     if mm==0 and is_number(turn_command):
                         num_ring = int(turn_command)
                         ring = find_element(num_ring, puzzle_rings)
-                        part_mas, _ = find_parts_in_circle(ring, puzzle_parts, 1)
+                        part_mas, _ = find_parts_in_circle(ring, puzzle_parts, puzzle_rings, 1)
                         angle_deg = float(cut_command[mm + 1])
                         direction = 1
                         angle = radians(angle_deg)
@@ -860,7 +893,7 @@ def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut
 
                         # повернуть все части внутри круга
                         ring1 = find_element(num_ring, puzzle_rings)
-                        part_mas, _ = find_parts_in_circle(ring1, puzzle_parts, 1)
+                        part_mas, _ = find_parts_in_circle(ring1, puzzle_parts, puzzle_rings, 1)
                         if typeof(ring1[4]) == "list" and step > 1:
                             for _ in range(step):
                                 angle_deg = find_angle_rotate(ring1, direction)
@@ -901,22 +934,3 @@ def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut
     sort_and_renum_all_parts(puzzle_parts)
 
     calc_parts_countur(puzzle_parts, puzzle_arch)
-
-def find_incorrect_parts(puzzle_parts, puzzle_arch):
-    calc_parts_countur(puzzle_parts, puzzle_arch)
-
-    # поиск накладывающихся друг на друга кусочков
-    for nn,part1 in enumerate(puzzle_parts):
-        count_in = count_out = 0
-        for mm, part2 in enumerate(puzzle_parts[nn+1:]):
-            for x,y in part1[6]:
-                fl_pol, _ = check_polygon(part2[7], x, y)
-                if count_in:
-                    count_in += 1
-                else:
-                    count_out += 1
-                if count_in>0 and count_out>0:
-                    break
-
-
-

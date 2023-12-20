@@ -1,4 +1,4 @@
-from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians
+from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians, degrees, hypot
 
 def compare_xy(x, y, rr):
     # сравнение двух величин, с учетом погрешности
@@ -183,6 +183,46 @@ def circles_intersect(x1,y1,r1,x2,y2,r2):
             inter.pop(1)
 
     return inter
+
+def calc_arch_spline(arch_mas, arch_x, arch_y, arch_r, direction, max_iter = 0):
+    # расчет всех точек сплайна для полигона. max_iter - дает возможность поcчитать только грубое приближение
+    fl_error = False
+    step = 1
+    input_xy = arch_mas.copy()
+    fl_iter, iter = True, 0
+    while fl_iter:
+        fl_iter, iter = False, iter + 1
+        mas_xy, len_mas = [], len(input_xy) - 1
+        for nn in range(len_mas):
+            mas_xy.append([input_xy[nn][0], input_xy[nn][1]])
+
+            x1, y1 = mas_pos(input_xy, nn)
+            x3, y3 = mas_pos(input_xy, nn + 1)
+
+            len_vek = calc_length(x1, y1, x3, y3)
+            if iter==1 and x1==x3 and y1==y3:
+                # чистая окружность с одной исходной точкой
+                x2, y2 = (arch_x-x1)+arch_x, (arch_y-y1)+arch_y
+                mas_xy.append([x2, y2])
+                fl_iter = True
+
+            elif len_vek > step:
+                x2, y2 = calc_center_arch(x1, y1, x3, y3, arch_x, arch_y, arch_r, direction)
+
+                mas_xy.append([x2, y2])
+                fl_iter = True
+        mas_xy.append([input_xy[len_mas][0], input_xy[len_mas][1]])
+        input_xy = mas_xy.copy()
+
+        if max_iter>0 and iter>=max_iter:
+            break
+
+        if iter > 100:
+            print("BAD !!!! - "+str(iter))
+            fl_error = True
+            break # иногда уходит в бесконечный цикл... ;(
+
+    return mas_xy, fl_error
 
 def check_point_in_arch(p1x, p1y, p2x, p2y, ax, ay, cx, cy, anti):
     # проверяет попадает ли точка внутрь дуги

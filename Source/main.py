@@ -2,9 +2,10 @@ from work import *
 from syst import *
 
 import pygame
+import pygame.gfxdraw
 import pygame_widgets
 
-from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians, degrees
+from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians, degrees, hypot
 
 from tkinter import Tk
 import os
@@ -13,7 +14,7 @@ import keyboard
 import ptext
 # import Pillow - for pyinstaller spalsh screen
 
-VERSION = "1.8"
+VERSION = "1.8.2"
 
 # TODO 1. Поиск пересекающихся частей - вывод инфо об ошибках
 
@@ -55,7 +56,7 @@ PARTS_COLOR =    [(255, 255, 255, 255), (30, 30, 30, 255), (150, 150, 150, 255),
 WIN_WIDTH, WIN_HEIGHT = 470, 300
 PANEL = 33 * 3
 BORDER = 20
-COUNTUR = 4
+COUNTUR = 1.5
 GAME = (WIN_WIDTH, WIN_HEIGHT)
 
 dirname = filename = ""
@@ -174,7 +175,7 @@ def main():
             os.environ['SDL_VIDEO_CENTERED'] = '0'
 
             screen = pygame.display.set_mode(DISPLAY, RESIZABLE)  # Создаем окошко
-        game_scr = Surface(GAME) # pygame.SRCALPHA
+        game_scr = Surface(GAME) # , pygame.SRCALPHA, 32) #
 
         if not fl_resize:
             win_caption = puzzle_name if puzzle_name != "" else "Geraniums Pot Simulator"
@@ -232,7 +233,7 @@ def main():
                     #############################################################################
                     # 1. найдем все части внутри круга
                     ring = find_element(ring_num, puzzle_rings)
-                    part_mas, part_mas_other = find_parts_in_circle(ring, puzzle_parts)
+                    part_mas, part_mas_other = find_parts_in_circle(ring, puzzle_parts, puzzle_rings)
 
                     if len(part_mas) == 0: break
 
@@ -243,24 +244,26 @@ def main():
                         # 2.1 анимация. сформируем круглый спрайт для дальнейшего вращения
                         animation_on = True
 
-                        game_sprite = Surface((ring[3] * 2, ring[3] * 2), pygame.SRCALPHA)
+                        game_sprite = Surface((ring[3] * 2, ring[3] * 2), pygame.SRCALPHA, 32)
+                        game_sprite = game_sprite.convert_alpha()
 
                         step, count = int(ring[3] * radians(angle_rotate) / puzzle_speed), 0
                         angle, angle_deg = radians(angle_rotate) / step, angle_rotate / step
                         shift_x, shift_y = ring[1] - ring[3], ring[2] - ring[3]
 
-                        pygame.draw.circle(game_sprite,GRAY_COLOR, (ring[3],ring[3]), ring[3])
+                        game_sprite.fill((0, 0, 0, 0))
+                        # pygame.draw.circle(game_sprite,(96, 96, 96, 100), (ring[3],ring[3]), ring[3])
                         for nn, part in enumerate(part_mas):
                             part_mas_rot = copy.deepcopy(part[7])  # нужно для пересчета координат. чтобы круг вписался в спрайт
                             for pos in part_mas_rot:
                                 pos[0], pos[1] = pos[0] - shift_x, pos[1] - shift_y
                             pygame.draw.polygon(game_sprite, PARTS_COLOR[part[1]], part_mas_rot, 0)
-                            pygame.draw.polygon(game_sprite, BLACK_COLOR, part_mas_rot, COUNTUR)
+                            draw_smoth_polygon(game_sprite, BLACK_COLOR, part_mas_rot, COUNTUR)
 
                             if len(part[3])==0: continue
                             marker_text, marker_angle, marker_size, marker_horizontal_shift, marker_vertical_shift, marker_sprite = part[3]
                             center_x, center_y, area = part[4]
-                            center_x, center_y = center_x-shift_x - puzzle_scale*marker_horizontal_shift, center_y-shift_y - puzzle_scale*marker_vertical_shift
+                            center_x, center_y = center_x-shift_x + marker_horizontal_shift, center_y-shift_y - marker_vertical_shift
 
                             marker_sprite = pygame.transform.rotate(marker_sprite, marker_angle)
                             text_marker_place = marker_sprite.get_rect(center=(center_x, center_y))
@@ -294,18 +297,21 @@ def main():
                 # отрисовка контуров
                 for nn,ring in enumerate(puzzle_rings):
                     if ring[0]!=ring_select and ring[6]==0:
-                        pygame.draw.circle(game_scr,GRAY_COLOR2, (ring[1],ring[2]),ring[3]+5,3)
+                        # pygame.draw.circle(game_scr,GRAY_COLOR2, (ring[1],ring[2]),ring[3]+5,3)
+                        draw_smoth_polygon(game_scr, GRAY_COLOR2, ring[8], 2)
 
                 # отрисовка частей
                 for nn,part in enumerate(puzzle_parts):
                     if part[2]>0:
                         pygame.draw.polygon(game_scr,PARTS_COLOR[part[1]],part[7],0)
-                    pygame.draw.polygon(game_scr,BLACK_COLOR,part[7],COUNTUR)
+                    # pygame.draw.polygon(game_scr,BLACK_COLOR,part[7],COUNTUR)
+                    draw_smoth_polygon(game_scr,BLACK_COLOR,part[7],COUNTUR)
 
                 # отрисовка выделения
                 if ring_select>0:
                     ring = find_element(ring_select, puzzle_rings)
-                    pygame.draw.circle(game_scr,WHITE_COLOR, (ring[1],ring[2]),ring[3]+5,3)
+                    # pygame.draw.circle(game_scr,WHITE_COLOR, (ring[1],ring[2]),ring[3]+5,3)
+                    draw_smoth_polygon(game_scr, WHITE_COLOR, ring[8], 2)
 
                 # рисуем маркеры
                 for nn, part in enumerate(puzzle_parts):
@@ -316,12 +322,12 @@ def main():
                         marker_sprite, _ = ptext.draw(str(part[0]), (0, 0), color=marker_color, fontsize=10, sysfontname='Verdana', align="center")
                     elif len(part[3])!=0:
                         marker_text, marker_angle, marker_size, marker_horizontal_shift, marker_vertical_shift, marker_sprite = part[3]
-                        center_x -= marker_vertical_shift*puzzle_scale
-                        center_y -= marker_horizontal_shift*puzzle_scale
+                        center_x += marker_horizontal_shift
+                        center_y -= marker_vertical_shift
                         if marker_sprite=="":
                             if marker_size==0:
                                 marker_size = int(area/200)
-                            marker_sprite, _ = ptext.draw(marker_text, (marker_vertical_shift*puzzle_scale, marker_horizontal_shift*puzzle_scale), color=marker_color, fontsize=marker_size, sysfontname='Verdana', align="center")
+                            marker_sprite, _ = ptext.draw(marker_text, (0, 0), color=marker_color, fontsize=marker_size, sysfontname='Verdana', align="center")
                             part[3][5] = marker_sprite
                         marker_sprite = pygame.transform.rotate(marker_sprite, marker_angle)
                     if marker_sprite!="":
