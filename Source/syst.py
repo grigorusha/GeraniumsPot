@@ -101,7 +101,7 @@ def find_photo(puzzle_name, PHOTO):
     if os.path.isdir(dir):
         for root, dirs, files in os.walk(dir):
             for fil in files:
-                if (fil.lower() == puzzle_name.lower() + ".jpg") or (fil.lower() == puzzle_name.lower() + ".png"):
+                if (fil.lower() == puzzle_name.lower() + ".jpg") or (fil.lower() == puzzle_name.lower() + ".jpeg") or (fil.lower() == puzzle_name.lower() + ".png"):
                     photo_path = root + "\\" + fil
                     break
             if photo_path != "": break
@@ -119,3 +119,23 @@ def find_photo(puzzle_name, PHOTO):
 
             photo_screen = pygame.transform.scale(photo_screen, PHOTO)
     return photo_screen, PHOTO
+
+def close_spalsh_screen():
+    try:  # pyinstaller spalsh screen
+        import pyi_splash
+        pyi_splash.close()
+    except:
+        pass
+
+def purge_dir(parent, ext):
+    # удалить файлы в папке
+    for root, dirs, files in os.walk(parent):
+        for item in files:
+            # Delete subordinate files
+            filespec = os.path.join(root, item)
+            if filespec.endswith('.'+ext):
+                os.remove(filespec)
+        for item in dirs:
+            # Recursively perform this operation for subordinate directories
+            purge_dir(os.path.join(root, item), ext)
+            os.rmdir(os.path.join(root, item))

@@ -313,6 +313,36 @@ def load_puzzle(fl, init, dirname,filename):
                 return [],0,"","", "Can not open the file"
     return lines, puzzle_kol, dirname, filename,  ""
 
+def dir_test(dir_garden = "", dir_screenshots = ""):
+    mas_files = []
+    if dir_screenshots == "":
+        dir_screenshots = os.path.abspath(os.curdir)
+        if os.path.isdir(dir_screenshots + "\\ScreenShots"):
+            dir_screenshots += "\\ScreenShots"
+
+    if dir_garden == "":
+        dir = os.path.abspath(os.curdir)
+        if os.path.isdir(dir + "\\Garden"):
+            dir += "\\Garden"
+    else:
+        dir = dir_garden
+    if dir != "":
+        for root, dirs, files in os.walk(dir):
+            for fil in files:
+                if os.path.splitext(fil)[1].lower()==".txt":
+                    filename = os.path.join(root, fil)
+                    mas_files.append( [root, filename] )
+    return mas_files, dir, dir_screenshots
+
+def init_test(file_num, mas_files, BORDER, PARTS_COLOR):
+    if file_num>=len(mas_files):
+        return "Quit",0
+    dirname, filename = mas_files[file_num]
+    fil = read_file(dirname, filename, BORDER, PARTS_COLOR, "reset")
+
+    file_num += 1
+    return fil,file_num
+
 def init_puzzle(BORDER, PARTS_COLOR, VERSION):
     fl_init = file_ext = True
     dirname = filename = ""
@@ -395,7 +425,7 @@ def resize_window(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_scale, BORDER)
 
     return WIN_WIDTH, WIN_HEIGHT
 
-def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker, auto_marker_ring):
+def events_check_read_puzzle(events, fl_break, fl_reset, fl_test, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker, auto_marker_ring):
     mouse_x, mouse_y, mouse_left, mouse_right, fil = 0, 0, False, False, ""
     fl_resize = False
 
@@ -405,8 +435,12 @@ def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN
                 save_state(dirname, filename, VERSION)
             return SystemExit, "QUIT"
         if (ev.type == KEYDOWN and ev.key == K_ESCAPE):
+            if fl_test:
+                return SystemExit, "QUIT"
             help = 0 if help == 1 else help
             photo = 0 if photo == 1 else photo
+        if fl_test: continue
+
         if (ev.type == KEYDOWN and ev.key == K_F1):
             BTN_CLICK = True
             BTN_CLICK_STR = "help"
@@ -458,7 +492,8 @@ def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN
             else:
                 old_width, old_height = WIN_WIDTH, WIN_HEIGHT
                 fil = read_file(dirname, filename, BORDER, PARTS_COLOR, "reset")
-                window_front(win_caption)
+                if not fl_test:
+                    window_front(win_caption)
 
                 if typeof(fil) != "str":
                     puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
@@ -470,11 +505,13 @@ def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN
                         if fil == "":
                             fil = "Unknow error"
                         mb.showerror(message=("Bad puzzle-file: " + fil))
-                        window_front(win_caption)
+                        if not fl_test:
+                            window_front(win_caption)
         if (BTN_CLICK_STR == "open" or BTN_CLICK_STR == "prev" or BTN_CLICK_STR == "next") and help+photo == 0:
             fl_break = False
             fil = read_file(dirname, filename, BORDER, PARTS_COLOR, BTN_CLICK_STR)
-            window_front(win_caption)
+            if not fl_test:
+                window_front(win_caption)
 
             if typeof(fil) != "str":
                 puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
@@ -487,7 +524,8 @@ def events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN
                     if fil == "":
                         fil = "Unknow error"
                     mb.showerror(message=("Bad puzzle-file: " + fil))
-                    window_front(win_caption)
+                    if not fl_test:
+                        window_front(win_caption)
         if ev.type == DROPFILE and help+photo == 0:
             fl_break = False
             fil = read_file("", ev.file, BORDER, PARTS_COLOR, "drop")
@@ -641,7 +679,7 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
             if not (len(param_mas) == 5 or len(param_mas) == 6): return ("Incorrect 'Ring' parameters. In str=" + str(str_nom))
             param_mas[1], param_mas[2] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc)
             param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
-            param_mas5 = param_mas[5] if len(param_mas)==6 else 0
+            param_mas5 = int(param_mas[5]) if len(param_mas)==6 else 0
             puzzle_rings.append([ring_num, param_mas[1], param_mas[2], param_mas[3], param_mas[4], 0, param_mas5, [], []])
             ring_num += 1
 
@@ -652,7 +690,7 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
         elif command == "CopyRing":
             if not (len(param_mas) == 5 or len(param_mas) == 6): return ("Incorrect 'CopyRing' parameters. In str=" + str(str_nom))
             param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
-            param_mas5 = param_mas[5] if len(param_mas)==6 else 0
+            param_mas5 = int(param_mas[5]) if len(param_mas)==6 else 0
             center_x, center_y = copy_ring(int(param_mas[1]),param_mas[2],puzzle_rings)
             puzzle_rings.append([ring_num, center_x, center_y, param_mas[3], param_mas[4], 0, param_mas5, [], []])
             ring_num += 1

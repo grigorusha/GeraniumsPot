@@ -812,6 +812,8 @@ def check_all_rings(puzzle_rings):
                     link_type = 0
                     if ring[4]==ring2[4] and typeof(ring[4])!="list" and ring[6]==ring2[6]:
                         link_type = 1
+                    elif ring2[6]==1:
+                        link_type = 1
                     ring[7].append( [ring2[0],link_type] )
 
 def init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, auto_cut_parts, init=True):

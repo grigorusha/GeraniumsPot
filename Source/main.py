@@ -9,12 +9,14 @@ from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians, d
 
 from tkinter import Tk
 import os
+import sys
 import copy
 import keyboard
 import ptext
+import time
 # import Pillow - for pyinstaller spalsh screen
 
-VERSION = "1.8.2"
+VERSION = "1.8.3"
 
 # TODO 1. Поиск пересекающихся частей - вывод инфо об ошибках
 
@@ -127,6 +129,26 @@ def main():
     puzzle_rings, puzzle_arch, puzzle_parts, remove_parts, copy_parts = [], [], [], [], []
     vek_mul = -1
 
+    # инициализация режима Теста
+    fl_test = True if os.environ.get("GeraniumTest")=="1" else False
+    fl_test_scramble = 1 if os.environ.get("GeraniumTestScramble")=="1" else 0
+    file_num, dir_garden, dir_screenshots = 0, "", ""
+    arg_param = sys.argv[1:]
+    if len(arg_param)>0:
+        if arg_param[0].lower()=="test": fl_test = True
+        if arg_param[0].lower()=="test_scramble": fl_test_scramble = 1
+    if len(arg_param)>1:
+        dir_garden = arg_param[1]
+    if len(arg_param)>2:
+        dir_screenshots = arg_param[2]
+    if fl_test_scramble==1: fl_test = True
+    if fl_test:
+        mas_files, dir_garden, dir_screenshots = dir_test(dir_garden, dir_screenshots)
+        purge_dir(dir_screenshots, "jpg")
+
+        start_time = time.time()
+        print("Start testing...")
+
     # основная инициализация
     pygame.init()  # Инициация PyGame
     font = pygame.font.SysFont('Verdana', 18)
@@ -149,20 +171,24 @@ def main():
     ################################################################################
     # перезапуск программы при смене параметров
     while True:
-        if not file_ext and not fl_resize:
-            file_ext, fil = init_puzzle(BORDER, PARTS_COLOR, VERSION)
-
-            try:  # pyinstaller spalsh screen
-                import pyi_splash
-                pyi_splash.close()
-            except: pass
-
+        if fl_test:
+            file_ext, help_gen = True, False
+            fl_test_scramble = 1 if fl_test_scramble>0 else 0
+            fil,file_num = init_test(file_num, mas_files, BORDER, PARTS_COLOR)
+            close_spalsh_screen()
             if typeof(fil) != "str":
                 puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
             else: break
 
-        help_mul = 2
-        DISPLAY = (WIN_WIDTH, WIN_HEIGHT + PANEL)  # Группируем ширину и высоту в одну переменную
+        elif not file_ext and not fl_resize:
+            file_ext, fil = init_puzzle(BORDER, PARTS_COLOR, VERSION)
+            close_spalsh_screen()
+            if typeof(fil) != "str":
+                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_kol, vek_mul, dirname, filename, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts = fil
+            else: break
+
+        help_mul = 2 if not fl_test else 1.5
+        DISPLAY = (WIN_WIDTH, WIN_HEIGHT + PANEL)
         GAME = (puzzle_width+BORDER*2, puzzle_height+BORDER*2)
         HELP = (WIN_WIDTH // help_mul, WIN_HEIGHT // help_mul)
         PHOTO = (WIN_WIDTH // help_mul, WIN_HEIGHT // help_mul)
@@ -182,8 +208,9 @@ def main():
             if puzzle_author != "": win_caption += " (" + puzzle_author.strip() + ")"
             pygame.display.set_caption(win_caption)  # Пишем в шапку
 
-            keyboard.press_and_release("alt") # странный трюк, чтобы вернуть фокус после сплаш скрина
-            window_front(win_caption)
+            if not fl_test:
+                keyboard.press_and_release("alt") # странный трюк, чтобы вернуть фокус после сплаш скрина
+                window_front(win_caption)
 
             moves, moves_stack, redo_stack = 0, [], []
             solved = True
@@ -191,6 +218,8 @@ def main():
             mouse_xx, mouse_yy = 0, 0
             help,help_gen,photo,photo_gen = 0, True, 0, True
             animation_on, events = False, ""
+            if fl_test: help_gen = False
+
         fl_resize = False
 
         # инициализация кнопок
@@ -211,7 +240,7 @@ def main():
                 # обработка событий
                 if not help_gen: # при первом цикле, сначала надо полностью нарисовать, потом считывать кнопки
                     events = pygame.event.get()
-                    fil, fil2 = events_check_read_puzzle(events, fl_break, fl_reset, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker, auto_marker_ring)
+                    fil, fil2 = events_check_read_puzzle(events, fl_break, fl_reset, fl_test, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker, auto_marker_ring)
 
                     if typeof(fil2) == "str":
                         return fil
@@ -373,8 +402,32 @@ def main():
             pygame_widgets.update(events)
             pygame.display.update()  # обновление и вывод всех изменений на экран
 
+            if fl_test:
+                if fl_test_scramble<=1:
+                    screenshot = os.path.join(dir_screenshots, puzzle_name+".jpg")
+                    pygame.image.save(game_scr, screenshot)
+
+                    if photo_screen!="":
+                        game_scr.blit(photo_screen, (GAME[0]-PHOTO[0]-BORDER//3, BORDER//3))
+                        draw.rect(game_scr, Color("#B88800"), (GAME[0]-PHOTO[0]-2*(BORDER//3), 0, PHOTO[0]+2*(BORDER//3), PHOTO[1]+2*(BORDER//3)), BORDER//3)
+                        screenshot2 = os.path.join(dir_screenshots, puzzle_name+" (photo).jpg")
+                        pygame.image.save(game_scr, screenshot2)
+                else:
+                    screenshot = os.path.join(dir_screenshots, puzzle_name + " (scramble).jpg")
+                    pygame.image.save(game_scr, screenshot)
+
+                if fl_test_scramble==1:
+                    scramble_puzzle(puzzle_rings, puzzle_arch, puzzle_parts, "scramble")
+                    fl_test_scramble += 1
+                    continue
+
+                break
+
         # удаляем кнопки
         for btn in button_set:
             btn.hide()
+
+    if fl_test:
+        print("End testing: %s minutes" % ((time.time() - start_time) / 60))
 
 main()

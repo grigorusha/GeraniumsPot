@@ -187,7 +187,7 @@ def circles_intersect(x1,y1,r1,x2,y2,r2):
 def calc_arch_spline(arch_mas, arch_x, arch_y, arch_r, direction, max_iter = 0):
     # расчет всех точек сплайна для полигона. max_iter - дает возможность поcчитать только грубое приближение
     fl_error = False
-    step = 1
+    step = 0.7
     input_xy = arch_mas.copy()
     fl_iter, iter = True, 0
     while fl_iter:
