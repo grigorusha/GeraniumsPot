@@ -39,6 +39,10 @@ I have created files for all real intersecting circles puzzles, you can download
 
 ## The program supports various types of puzzles
 
+you can see a photo of the real puzzle or open a website with a description.
+
+![](https://i.imgur.com/LkldrIq.png)
+
 you can color any part in the color you want
 
 ![](https://i.imgur.com/Z3BplC6.png)
