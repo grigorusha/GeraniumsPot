@@ -49,7 +49,7 @@ you can make puzzles with different angles
 
 you can delete unnecessary parts
 
-![](https://i.imgur.com/JueQHNb.png)
+![](https://i.imgur.com/JpDQ8ME.png)
 
 you can manually set the splitting procedure
 
