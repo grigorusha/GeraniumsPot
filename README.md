@@ -58,3 +58,7 @@ you can manually set the splitting procedure
 you can make puzzles with a huge number of pieces
 
 ![](https://i.imgur.com/3Rvfvhn.png)
+
+you can do as many circles as you like
+
+![](https://i.imgur.com/vZKKxpz.png)
