@@ -1,10 +1,30 @@
-import win32gui
-from tkinter import Tk
-import os
-
 import pygame
-from math import hypot
+
+from tkinter import Tk
+import os,sys,win32gui
+
+from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians, degrees, hypot
 from calc import mas_pos
+
+def calc_param(elem, param_calc):
+    if typeof(elem)!="list":
+        elem = [elem]
+
+    for nn,ev in enumerate(elem):
+        for param in param_calc:
+            if param[0] == ev:
+                ev = param[1]
+                break
+            if ev.find(param[0]) >= 0:
+                ev = ev.replace(param[0], str(param[1]))
+        try:
+            elem[nn] = eval(ev)
+        except:
+            elem[nn] = float(ev)
+    if len(elem)==1:
+        elem = elem[0]
+
+    return elem
 
 def draw_smoth_polygon(surface, color, polygon, width):
     # рисуем плавную кривую с пиксельным сглаживанием
@@ -75,26 +95,6 @@ def is_number(s):
             return False
     return True
 
-def calc_param(elem, param_calc):
-    if typeof(elem)!="list":
-        elem = [elem]
-
-    for nn,ev in enumerate(elem):
-        for param in param_calc:
-            if param[0] == ev:
-                ev = param[1]
-                break
-            if ev.find(param[0]) >= 0:
-                ev = ev.replace(param[0], str(param[1]))
-        try:
-            elem[nn] = eval(ev)
-        except:
-            elem[nn] = float(ev)
-    if len(elem)==1:
-        elem = elem[0]
-
-    return elem
-
 def find_photo(puzzle_name, PHOTO):
     photo_screen, photo_path = "", ""
     dir = os.path.abspath(os.curdir) + "\\Photo"
@@ -127,15 +127,55 @@ def close_spalsh_screen():
     except:
         pass
 
-def purge_dir(parent, ext):
+def purge_dir(parent, ext_str):
     # удалить файлы в папке
-    for root, dirs, files in os.walk(parent):
-        for item in files:
-            # Delete subordinate files
-            filespec = os.path.join(root, item)
-            if filespec.endswith('.'+ext):
-                os.remove(filespec)
-        for item in dirs:
-            # Recursively perform this operation for subordinate directories
-            purge_dir(os.path.join(root, item), ext)
-            os.rmdir(os.path.join(root, item))
+    ext_mas = ext_str.split(",")
+    for ext in ext_mas:
+        for root, dirs, files in os.walk(parent):
+            for item in files:
+                # Delete subordinate files
+                filespec = os.path.join(root, item)
+                if filespec.endswith('.'+ext) or (item.lower()=="thumbs.db"):
+                    os.remove(filespec)
+            for item in dirs:
+                # Recursively perform this operation for subordinate directories
+                purge_dir(os.path.join(root, item), ext)
+                os.rmdir(os.path.join(root, item))
+
+def arg_param_check():
+    fl_reset_ini, fl_test, fl_test_photo, fl_test_scramble = False, False, False, 0
+    for param in os.environ:
+        param = param.lower()
+        if param.find("geraniumreset")>=0:
+            fl_reset_ini,fl_test = True,False
+            break
+        if param.find("geraniumtest")>=0: fl_test = True
+        if fl_test:
+            if param.find("photo")>=0: fl_test_photo = True
+            if param.find("scramble")>=0:
+                fl_test_scramble = os.environ[param.upper()]
+                count = int(fl_test_scramble) if is_number(fl_test_scramble) else 1
+                fl_test_scramble = count
+
+    dir_garden, dir_screenshots = "", ""
+    arg_param = sys.argv[1:]
+    if len(arg_param)>0:
+        param = arg_param[0].lower()
+        if param=="reset":
+            fl_reset_ini = True
+        elif param[:4]=="test":
+            fl_test = True
+        if fl_test:
+            if param.find("photo")>=0: fl_test_photo = True
+            if param.find("scramble")>=0:
+                pos = param.find("scramble")+8
+                count = param[pos:]
+                count = int(count) if is_number(count) else 1
+                fl_test_scramble = count
+    if len(arg_param)>1:
+        dir_garden = arg_param[1]
+    if len(arg_param)>2:
+        dir_screenshots = arg_param[2]
+    if fl_test_scramble==1: fl_test = True
+
+    return fl_reset_ini, fl_test, fl_test_photo, fl_test_scramble, dir_garden, dir_screenshots

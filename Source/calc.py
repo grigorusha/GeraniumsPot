@@ -76,6 +76,14 @@ def calc_area_polygon(polygon):
         area += y * x / 2
     return abs(area)
 
+def calc_max_radius(polygon, center_x, center_y):
+    # найдем расстояние до максимально удаленной точки от центроида полигона
+    max_radius = 0
+    for x,y in polygon:
+        length = calc_length(x,y, center_x, center_y)
+        max_radius = max(max_radius,length)
+    return max_radius
+
 def calc_centroid(polygon):
     # поиск координат центроида полигона
     x, y = 0, 0
@@ -95,9 +103,12 @@ def calc_centroid(polygon):
         y /= 6 * signed_area
     return x, y
 
-def check_polygon(polygon, x, y):
+def check_polygon(polygon, centroid, x, y):
     # проверка попадает ли точка внутрь полигона
-    center_x, center_y = calc_centroid(polygon)
+    if len(centroid)==0:
+        center_x, center_y = calc_centroid(polygon)
+    else:
+        center_x, center_y, _,_ = centroid
     length = calc_length(center_x, center_y, x, y)
 
     odd = False
@@ -116,18 +127,151 @@ def check_circle(center_x, center_y, x, y, rad, nn=2):
     # проверка попадает ли точка внутрь окружности, лежит ли она на окружности с небольшой погрешностью
     length = calc_length(center_x, center_y, x, y)
     in_ring = length/rad if rad != 0 else 0
-    return (length<=rad, compare_xy(in_ring, 1, nn), in_ring)
+    return (length<=rad, compare_xy(in_ring, 1, nn), in_ring, abs(rad-length))
 
-def rotate_point(center_x, center_y, x, y, angle):
+def binary_search(mas_points, x,y):
+    low,mid,high = 0,0,len(mas_points)-1
+
+    while low <= high:
+        mid = (high + low) // 2
+        point = mas_points[mid]
+
+        if compare_xy(x, point[0], 8):
+            if compare_xy(y, point[1], 8):
+                return mid,mid
+            elif point[1] < y:
+                low = mid + 1
+            elif point[1] > y:
+                high = mid - 1
+        else:
+            if point[0] < x:
+                low = mid + 1
+            elif point[0] > x:
+                high = mid - 1
+    return -1,mid
+
+def find_rotated_point(x, y, center_x, center_y, angle, puzzle_points):
+    nn,pp = binary_search(puzzle_points, x, y)
+    if nn>=0:
+        mm = 0
+        mas_new_pos = puzzle_points[nn][2]
+        for center_x2,center_y2,angle2,_,_ in mas_new_pos:
+            if compare_xy(center_x,center_x2,8) and compare_xy(center_y,center_y2,8) and compare_xy(angle,angle2,8):
+                return nn,mm,pp
+            mm += 1
+        return nn,-1,pp
+    return -1,-1,pp
+
+def rotate_point(x, y, center_x, center_y, angle, puzzle_points, fl_find_point = True):
     # поворот точки относительно центра координат по часовой стрелке
-    adjusted_x,adjusted_y = x - center_x, y - center_y
-    cos_rad,sin_rad = cos(angle),sin(angle)
+    adjusted_x, adjusted_y = x - center_x, y - center_y
+    cos_rad, sin_rad = cos(angle), sin(angle)
     qx = cos_rad * adjusted_x + sin_rad * adjusted_y
     qy = cos_rad * adjusted_y - sin_rad * adjusted_x
     qx, qy = center_x + qx, center_y + qy
-    return round(qx,10), round(qy,10)
+    qx, qy = round(qx, 10), round(qy, 10)
+    return qx, qy
 
-def circles_intersect(x1,y1,r1,x2,y2,r2):
+    # # сначала поищем точку в кэше - как выяснил кэширование работает медленнее, чем просто расчет тригонометрии
+    # # puzzle_points - [x, y, [center_x, center_y, angle, rotated_x, rotated_y]]
+    # if fl_find_point:
+    #     pos,pos2,pos3 = find_rotated_point(x, y, center_x, center_y, angle, puzzle_points)
+    # else:
+    #     pos = pos2 = pos3 = -1
+    #
+    # if pos2 < 0:
+    #     adjusted_x,adjusted_y = x - center_x, y - center_y
+    #     cos_rad,sin_rad = cos(angle),sin(angle)
+    #     qx = cos_rad * adjusted_x + sin_rad * adjusted_y
+    #     qy = cos_rad * adjusted_y - sin_rad * adjusted_x
+    #     qx, qy = center_x + qx, center_y + qy
+    #     qx, qy = round(qx, 10), round(qy, 10)
+    #
+    #     if compare_xy(x,qx,8) and compare_xy(y,qy,8):
+    #         pass
+    #     elif fl_find_point:
+    #         if pos < 0:
+    #             if len(puzzle_points)==0:
+    #                 puzzle_points.append([round(x, 10), round(y, 10), [[center_x, center_y, angle, qx, qy]]])
+    #             else:
+    #                 puzzle_points.insert(pos3,[round(x, 10), round(y, 10), [[center_x, center_y, angle, qx, qy]]])
+    #             # puzzle_points.sort(key=lambda points: (points[0], points[1]))
+    #         else:
+    #             mas_new_pos = puzzle_points[pos][2]
+    #             mas_new_pos.append([center_x, center_y, angle, qx, qy])
+    # else:
+    #     mas_new_pos = puzzle_points[pos][2]
+    #     qx, qy = mas_new_pos[pos2][3],mas_new_pos[pos2][4]
+    # return qx, qy
+
+def mirror_point(x,y, mirror_line):
+    # отзеркалим точку относительно линии
+    line_start_x,line_start_y, line_end_x,line_end_y = mirror_line
+    if compare_xy(line_start_x,line_end_x,8) and compare_xy(line_start_y,line_end_y,8):
+        # вырожденный случай, вместо линии точка.
+        mirror_point_x,mirror_point_y = line_start_x,line_start_y
+    else:
+        dx = line_end_x - line_start_x
+        dy = line_end_y - line_start_y
+
+        length_squared = dx*dx + dy*dy
+        u = ((x - line_start_x) * dx + (y - line_start_y) * dy) / length_squared
+
+        mirror_point_x = line_start_x + u * dx
+        mirror_point_y = line_start_y + u * dy
+
+    opposite_x = 2 * mirror_point_x - x
+    opposite_y = 2 * mirror_point_y - y
+    return opposite_x, opposite_y
+
+def circle_line_intersect(x,y,r, px1,py1, px2,py2):
+    # возвращаем точки пересечения или точку касания окружности и линии
+
+    inter = []
+    px1,py1 = round(px1-x,10),round(py1-y,10)
+    px2,py2 = round(px2-x,10),round(py2-y,10)
+
+    if compare_xy(px1, px2, 8): # вертикальная линия
+        px = px1
+        d = r*r - px*px
+
+        if compare_xy(d,0,8): # касательная
+            inter.append( (round(x+px,10),round(y,10)) )
+            return inter
+        if d < 0:
+            return inter
+        dd = sqrt(d)
+
+        py = dd
+        inter.append( (round(x+px,10),round(y+py,10)) )
+        py = -dd
+        inter.append( (round(x+px,10),round(y+py,10)) )
+
+    else:
+        m = (py2-py1)/(px2-px1)
+        n = - (m*px1+py1)
+        a,b,c = m*m+1, 2*m*n, n*n-r*r
+        d = b*b-4*a*c
+
+        if compare_xy(d,0,8):
+            px = -b / (2*a)
+            py = m*px+n
+            inter.append( (round(x+px,10),round(y+py,10)) )
+            return inter
+        if d<0 :
+            return inter
+        dd = sqrt(d)
+
+        px = (-b+dd) / (2*a)
+        py = m*px+n
+        inter.append( (round(x+px,10),round(y+py,10)) )
+        px = (-b-dd) / (2*a)
+        py = m*px+n
+        inter.append( (round(x+px,10),round(y+py,10)) )
+
+    return inter
+
+def two_circles_intersect(x1,y1,r1,x2,y2,r2):
     # возвращаем точки пересечения или точку касания двух окружностей
     if compare_xy(x1,x2,8) and compare_xy(y1,y2,8):
         return []
@@ -280,3 +424,51 @@ def get_command(cut_command):
     if direction == 0: return 0, 0, 0
     step = 1 if len(command) == pos + 1 else int(command[pos + 1:])
     return num_ring, direction, step
+
+def check_line_intersect(px1,py1, qx1,qy1, px2,py2, qx2,qy2):
+    # https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
+    # Основная функция, которая возвращает true, если отрезки «p1q1» и «p2q2» пересекаются.
+
+    def on_segment(px,py, qx,qy, rx,ry):
+        # функция проверяет, лежит ли точка q на отрезке 'pr'.
+        if ((qx <= max(px, rx)) and (qx >= min(px, rx)) and (qy <= max(py, ry)) and (qy >= min(py, ry))):
+            return True
+        return False
+
+    def orientation(px,py, qx,qy, rx,ry):
+        # найти ориентацию упорядоченного триплета из точек (p,q,r). функция возвращает следующие значения:
+        # 0 : Collinear points, 1 : Clockwise points, 2 : Counterclockwise
+        val1 = float(qy-py)*(rx-qx)
+        val2 = float(qx-px)*(ry-qy)
+        if compare_xy(val1,val2, 8): # Collinear orientation
+            return 0
+        elif (val1 > val2): # Clockwise orientation
+            return 1
+        elif (val1 < val2): # Counterclockwise orientation
+            return 2
+
+    # Найти 4 ориентации, необходимые для общих и особых случаев.
+    o1 = orientation(px1,py1, qx1,qy1, px2,py2)
+    o2 = orientation(px1,py1, qx1,qy1, qx2,qy2)
+    o3 = orientation(px2,py2, qx2,qy2, px1,py1)
+    o4 = orientation(px2,py2, qx2,qy2, qx1,qy1)
+
+    # общий случай - чистое пересечение
+    if ((o1 != o2) and (o3 != o4)):
+        return True
+
+    # особые случаи - один конец отрезка лежит на другом отрезке
+
+    # p1,q1 и p2 лежат на одной прямой, а p2 лежит на отрезке p1q1.
+    if ((o1 == 0) and on_segment(px1,py1, px2,py2, qx1,qy1)): return True
+
+    # q2 лежит на отрезке p1q1
+    if ((o2 == 0) and on_segment(px1,py1, qx2,qy2, qx1,qy1)): return True
+
+    # p1 лежит на отрезке p2q2
+    if ((o3 == 0) and on_segment(px2,py2, px1,py1, qx2,qy2)): return True
+
+    # q1 лежит на отрезке p2q2
+    if ((o4 == 0) and on_segment(px2,py2, qx1,qy1, qx2,qy2)): return True
+
+    return False
