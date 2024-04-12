@@ -55,6 +55,10 @@ you can manually set the splitting procedure
 
 ![](https://i.imgur.com/Tt1CX5t.png)
 
+you can make more complex puzzles with text markers
+
+![](https://i.imgur.com/6Oeqah6.png)
+
 you can make puzzles with a huge number of pieces
 
 ![](https://i.imgur.com/3Rvfvhn.png)
@@ -62,3 +66,11 @@ you can make puzzles with a huge number of pieces
 you can do as many circles as you like
 
 ![](https://i.imgur.com/vZKKxpz.png)
+
+you can create a puzzle of any complexity
+
+![](https://i.imgur.com/xm4EypO.png)
+
+you can meet the craziest puzzles - are no limits here
+
+![](https://i.imgur.com/a2c3TXV.png)
