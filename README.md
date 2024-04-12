@@ -9,7 +9,7 @@ This is a simulator of the famous "Geranium" puzzles.  I added 454 different puz
 You can create a text file with a script that describes the location of circles.
 I have created files for all real intersecting circles puzzles, you can download them from the "Garden" folder.
 
-![](https://i.imgur.com/Z3BplC6.png)
+![](https://i.imgur.com/aurEp5w.png)
 
 ## How to play
 ### Mouse
@@ -40,7 +40,7 @@ I have created files for all real intersecting circles puzzles, you can download
 
 you can color any part in the color you want
 
-![](https://i.imgur.com/wIOPhf0.png)
+![](https://i.imgur.com/Z3BplC6.png)
 
 you can make puzzles with different angles
 
@@ -57,15 +57,3 @@ you can manually set the splitting procedure
 you can make puzzles with a huge number of pieces
 
 ![](https://i.imgur.com/3Rvfvhn.png)
-
-![](https://i.imgur.com/tJzbWpj.png)
-
-you can do bandaged parts
-
-![](https://i.imgur.com/qN6XmQx.png)
-
-
-## I made a small instruction for programmers
-I made the process of creating new puzzles very easy. I hope you will like it
-
-**<a href="https://twistypuzzles.com/forum/viewtopic.php?p=424334#p424334">Instruction for script-makers</a>**
