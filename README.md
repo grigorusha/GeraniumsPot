@@ -9,7 +9,6 @@ This is a simulator of the famous "Geranium" puzzles.  I added 454 different puz
 You can create a text file with a script that describes the location of circles.
 I have created files for all real intersecting circles puzzles, you can download them from the "Garden" folder.
 
-
 ![](https://i.imgur.com/aurEp5w.png)
 
 ## How to play
@@ -62,6 +61,18 @@ you can manually set the splitting procedure
 you can make more complex puzzles with text markers
 
 ![](https://i.imgur.com/6Oeqah6.png)
+
+you can make puzzles with nested circles
+
+![](https://i.imgur.com/PGgg9qM.png)
+
+you can make puzzles with very deep intersecting circles
+
+![](https://i.imgur.com/sZfpzuX.png)
+
+you can make a puzzle where only the outer part of the circle rotates
+
+![](https://i.imgur.com/JwjCWCB.png)
 
 you can make puzzles with a huge number of pieces
 
