@@ -2,7 +2,7 @@
 
 This is a simulator of the famous "Geranium" puzzles.  I added 454 different puzzles.
 
-### **<a href="https://github.com/grigorusha/GeraniumsPot/releases/">Download EXEcutable file for Geraniums Pot Simulator</a>** 
+### **<a href="https://github.com/grigorusha/GeraniumsPot/releases/">Download win-installer for Geraniums Pot Simulator</a>** 
 
 ### **<a href="https://twistypuzzles.com/forum/viewtopic.php?p=422931#p422931">forum page with my other Puzzle simulators</a>**
 
