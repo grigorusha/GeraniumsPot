@@ -9,6 +9,7 @@ This is a simulator of the famous "Geranium" puzzles.  I added 454 different puz
 You can create a text file with a script that describes the location of circles.
 I have created files for all real intersecting circles puzzles, you can download them from the "Garden" folder.
 
+
 ![](https://i.imgur.com/aurEp5w.png)
 
 ## How to play
