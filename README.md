@@ -27,6 +27,8 @@ You can download the Gallery.zip file to see all the screenshots of all the puzz
 - **F3** - opening a file with a new circles-puzzle
 - **F4** - automatic scramble puzzle
 - **F5** - opens a small window showing the photo with real puzzle.
+- **F6** - toggle markers
+- **F7** - make screenshot and copy to clipboard
 - **F8** - automatic super-scramble
 - **F11** - previous puzzle
 - **F12** - next puzzle
