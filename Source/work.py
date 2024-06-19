@@ -3,7 +3,8 @@ from syst import *
 
 from pygame import *
 
-import os,webbrowser
+import os,webbrowser,ptext
+
 from tkinter import filedialog as fd
 from tkinter import messagebox as mb
 
@@ -30,14 +31,14 @@ def mouse_move_click(mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_rig
         # проверим концентрические круги
         for ring in puzzle_rings:
             if len(ring[7])==0: continue
-            fl_link,pos = False,-1
-            for linked in ring[7]:
+            fl_inner,pos = False,-1
+            for inner in ring[7]:
                 for nn,ring_info in enumerate(ring_pos):
-                    if linked[0]==ring_info[0]:
-                        fl_link = True
+                    if inner[0]==ring_info[0]:
+                        fl_inner = True
                     if ring[0]==ring_info[0]:
                         pos=nn
-            if fl_link and pos>=0:
+            if fl_inner and pos>=0:
                 ring_pos.pop(pos)
 
         # print(ring_pos)
@@ -56,13 +57,13 @@ def mouse_move_click(mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_rig
 
     return ring_num, ring_select, direction
 
-def draw_all_text(screen, font, font2, puzzle_kol, rings_kol, parts_kol, moves, solved, button_Open, button_Help, toggle_Marker, toggle_Circle, button_y2, button_y3, button_y4):
+def draw_all_text(screen, font, font2, puzzle_kol, rings_kol, parts_kol, moves, solved, button_Save, button_Help, toggle_Marker, toggle_Circle, button_y2, button_y3, button_y4):
     WHITE_COLOR, RED_COLOR, GREEN_COLOR, BLUE_COLOR, YELLOW_COLOR = "#FFFFFF", "#FF0000", "#008000", "#0000FF", "#FFFF00"
 
     # 2
     # Пишем количество уровней
     text_puzzles = font2.render(str(puzzle_kol) + ' puzzles', True, WHITE_COLOR)
-    text_puzzles_place = text_puzzles.get_rect(topleft=(button_Open.textRect.right + 10, button_y2 + 1))
+    text_puzzles_place = text_puzzles.get_rect(topleft=(button_Save.textRect.right + 10, button_y2 + 1))
     screen.blit(text_puzzles, text_puzzles_place)
     # Пишем количество перемещений
     text_moves = font.render('Moves: ' + str(moves), True, RED_COLOR)
@@ -96,11 +97,18 @@ def draw_all_text(screen, font, font2, puzzle_kol, rings_kol, parts_kol, moves, 
     screen.blit(text_info, text_info_place)
 
 def save_state(dirname, filename, VERSION):
+    if check_os_platform()=="windows":
+        user_profile = 'LOCALAPPDATA'
+    else:
+        user_profile = 'HOME'
+
     command_mas = []
+    command_mas.append(["", "# Geraniums Pot - Intersecting Circles Puzzles Simulator. Ini-file:" + "\n", []])
+    command_mas.append(["", "\n", []])
     command_mas.append(["DirName", dirname, []])
     command_mas.append(["PuzzleFile", filename, []])
 
-    app_folder = os.getenv('LOCALAPPDATA')+'\\Geraniums Pot '+VERSION+'\\'
+    app_folder = os.path.join(os.getenv(user_profile),'Geraniums Pot '+VERSION)
     if not os.path.isdir(app_folder):
         try:
             os.mkdir(app_folder)
@@ -108,14 +116,124 @@ def save_state(dirname, filename, VERSION):
         if not os.path.isdir(app_folder):
             return
 
-    app_ini = app_folder+'Geraniums Pot.ini'
+    app_ini = os.path.join(app_folder,'Geraniums Pot.ini')
     save_file(app_ini, command_mas)
+
+def save_puzzle(dirname, filename, puzzle_name, puzzle_author, puzzle_web_link, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, moves_stack):
+    save_puzzle_file = os.path.splitext(filename)[0]+'.save'
+    filetypes = (("Puzzle file", "*.save"), ("Any file", "*"))
+    save_puzzle_file = fd.asksaveasfilename(title="Save Puzzle", initialdir=dirname, initialfile=os.path.basename(save_puzzle_file), filetypes=filetypes, confirmoverwrite=True)
+    if save_puzzle_file == "": return
+    #########################################################################################
+
+    command_mas = []
+    command_mas.append(["", "# Geraniums Pot - Intersecting Circles Puzzles Simulator. Save-file:" + "\n", []])
+    command_mas.append(["", "\n", []])
+    command_mas.append(["DirName", "\""+dirname+"\"", []])
+    command_mas.append(["PuzzleFile", "\""+filename+"\"", []])
+    command_mas.append(["", "\n", []])
+    command_mas.append(["Name", puzzle_name, []])
+    command_mas.append(["Author", puzzle_author, []])
+    for link in puzzle_web_link:
+        command_mas.append(["Link", link, []])
+    command_mas.append(["", "\n", []])
+
+    command_mas.append(["Speed", puzzle_speed, []])
+    command_mas.append(["Scale", 1, []])
+    command_mas.append(["", "\n", []])
+
+    if len(moves_stack)>0:
+        command_mas.append(["", "# ring number, direction"+"\n", []])
+        command_mas.append(["MovesStack", "", moves_stack])
+        command_mas.append(["", "\n", []])
+
+    fl_linked = False
+    command_mas.append(["", "# ring number, center coordinates x y, radius, angle, type, gear ratio"+"\n", []])
+    for ring in puzzle_rings:
+        angle_mas_str = ring[4]
+        if typeof(ring[4]) == "list":
+            angle_mas, angle_pos, angle_mas_str = ring[4], ring[5], "("
+            for nn in range(len(angle_mas)):
+                angle_mas_str += str(mas_pos(angle_mas,nn+angle_pos))
+                if nn<len(angle_mas)-1:
+                    angle_mas_str += ","
+            angle_mas_str += ")"
+        ring_mas = [ ring[0],ring[1],ring[2],ring[3],angle_mas_str ]
+        if ring[6]!=0 and (len(ring[8]) == 0 or len(ring[8][1]) == 0):
+            ring_mas.append(ring[6])
+        if not (len(ring[8]) == 0 or len(ring[8][1]) == 0):
+            ring_mas.append(ring[6])
+            ring_mas.append(ring[8][0])
+            fl_linked = True
+
+        command_mas.append(["Ring", "", ring_mas])
+    command_mas.append(["", "\n", []])
+
+    if fl_linked:
+        def check_linked_mass(ring_num, linked_mass):
+            if len(linked_mass)==0: False
+            for linked in linked_mass:
+                if (ring_num in linked) or (-ring_num in linked):
+                    return True
+            return False
+
+        linked_mass = []
+        for ring in puzzle_rings:
+            if len(ring[8]) == 0 or len(ring[8][1]) == 0: continue
+            if not check_linked_mass(ring[0], linked_mass):
+                linked = []
+                for link in ring[8][1]:
+                    linked.append(link[0]*link[1])
+                linked_mass.append(linked)
+
+        command_mas.append(["", "# specify linked rings. if the number is negative, then the rotation will be in the opposite direction"+"\n", []])
+        command_mas.append(["Linked", "", linked_mass])
+        command_mas.append(["", "\n", []])
+
+    command_mas.append(["", "# arch number, center coordinates x y, radius"+"\n", []])
+    for arch in puzzle_arch:
+        command_mas.append(["Arch", "", [ arch[0],arch[1],arch[2],arch[3] ]])
+    command_mas.append(["", "\n", []])
+
+    command_mas.append(["", "# part number, color, visible"+"\n", []])
+    command_mas.append(["", "#   marker text, angle, size, shift horizontal vertical"+"\n", []])
+    command_mas.append(["", "#   arch number, type, direction, start x y"+"\n", []])
+    for part in puzzle_parts:
+        command_mas.append(["Part", "", [part[0], part[1], part[2]]])
+
+        part_marker = part[3]
+        if len(part_marker)>0:
+            command_mas.append(["PartMarker", "", [part_marker[0], part_marker[1], part_marker[2], part_marker[3], part_marker[4]]])
+        for part_arch in part[5]:
+            command_mas.append(["PartArch", "", [part_arch[0], part_arch[1], part_arch[2], part_arch[3], part_arch[4]]])
+
+    command_mas.append(["", "\n", []])
+
+    save_file(save_puzzle_file, command_mas)
 
 def save_file(filename, command_mas):
     with open(filename, encoding='utf-8', mode='w') as f:
-        f.write("# Geraniums Pot - Intersecting Circles Puzzles Simulator"+"\n")
         for command,params,param_mas in command_mas:
-            stroka = ""+command+": "+params+"\n"
+            if command=="":
+                stroka = str(params)
+            else:
+                stroka = "" + command + ": "
+                if len(param_mas)==0:
+                    stroka += str(params)+"\n"
+                else:
+                    for nn,par in enumerate(param_mas):
+                        if typeof(par)=="list":
+                            stroka += "("
+                            for mm in range(len(par)):
+                                stroka += str(par[mm])
+                                if mm < len(par) - 1:
+                                    stroka += ","
+                            stroka += ")"
+                        else:
+                            stroka += str(par)
+                        if nn<len(param_mas)-1:
+                            stroka += ", "
+                    stroka += "\n"
             f.write(stroka)
 
 def expand_script(lines):
@@ -318,12 +436,11 @@ def align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzz
     return vek_mul, puzzle_width, puzzle_height
 
 def load_puzzle(fl, init, dirname,filename):
-    puzzle_kol = 0
-    lines = []
+    fl_load_save, puzzle_kol, lines = False, 0, []
 
     dir = os.path.abspath(os.curdir)
-    if os.path.isdir(dir + "\\Garden"):
-        dir += "\\Garden"
+    if os.path.isdir(os.path.join(dir,"Garden")):
+        dir = os.path.join(dir,"Garden")
     if dir != "":
         for root, dirs, files in os.walk(dir):
             for fil in files:
@@ -334,8 +451,8 @@ def load_puzzle(fl, init, dirname,filename):
     ###################################################################################
     if dirname == "":
         dirname = os.path.abspath(os.curdir)
-        if os.path.isdir(dirname + "\\Garden"):
-            dirname += "\\Garden"
+        if os.path.isdir(os.path.join(dirname,"Garden")):
+            dirname = os.path.join(dirname,"Garden")
     if fl == "init":
         lines = init.split("\n")
     else:
@@ -355,14 +472,20 @@ def load_puzzle(fl, init, dirname,filename):
                     f_name = files[pos]
                     filename = os.path.join(dirname, f_name)
         elif fl == "open" or filename == "":
-            filetypes = (("Text file", "*.txt"), ("Any file", "*"))
+            filetypes = (("Puzzle files", "*.txt;*.save"), ("Puzzles", "*.txt"), ("Saves", "*.save"), ("Any files", "*"))
+            if check_os_platform() != "windows":
+                filetypes = (("Puzzles", "*.txt"), ("Saves", "*.save"), ("Any files", "*"))
             f_name = fd.askopenfilename(title="Open Puzzle", initialdir=dirname, filetypes=filetypes)
             if f_name == "":
-                return [],0,"","", "-"
+                return [],0,"","", False, "-"
             filename = f_name
             dirname = os.path.dirname(filename)
         elif fl == "drop" and filename != "":
             dirname = os.path.dirname(filename)
+
+        _, file_extension = os.path.splitext(filename)
+        if file_extension.lower()==".save":
+            fl_load_save = True
 
         try:
             with open(filename, encoding = 'utf-8', mode = 'r') as f:
@@ -372,20 +495,20 @@ def load_puzzle(fl, init, dirname,filename):
                 with open(filename, mode='r') as f:
                     lines = f.readlines()
             except:
-                return [],0,"","", "Can not open the file"
-    return lines, puzzle_kol, dirname, filename,  ""
+                return [],0,"","", False, "Can not open the file"
+    return lines, puzzle_kol, dirname, filename,  fl_load_save, ""
 
 def dir_test(dir_garden = "", dir_screenshots = ""):
     mas_files = []
     if dir_screenshots == "":
         dir_screenshots = os.path.abspath(os.curdir)
-        if os.path.isdir(dir_screenshots + "\\ScreenShots"):
-            dir_screenshots += "\\ScreenShots"
+        if os.path.isdir(os.path.join(dir_screenshots,"ScreenShots")):
+            dir_screenshots = os.path.join(dir_screenshots,"ScreenShots")
 
     if dir_garden == "":
         dir = os.path.abspath(os.curdir)
-        if os.path.isdir(dir + "\\Garden"):
-            dir += "\\Garden"
+        if os.path.isdir(os.path.join(dir,"Garden")):
+            dir = os.path.join(dir,"Garden")
     else:
         dir = dir_garden
     if dir != "":
@@ -406,11 +529,16 @@ def init_test(file_num, mas_files, BORDER, PARTS_COLOR):
     return fil,file_num
 
 def init_puzzle(BORDER, PARTS_COLOR, VERSION, fl_reset_ini = False, fl_esc = False):
+    if check_os_platform()=="windows":
+        user_profile = 'LOCALAPPDATA'
+    else:
+        user_profile = 'HOME'
+
     fl_init = file_ext = True
     dirname = filename = ""
     if not fl_esc:
-        app_folder = os.getenv('LOCALAPPDATA') + '\\Geraniums Pot '+VERSION+'\\'
-        app_ini = app_folder + 'Geraniums Pot.ini'
+        app_folder = os.path.join(os.getenv(user_profile),'Geraniums Pot '+VERSION)
+        app_ini = os.path.join(app_folder,'Geraniums Pot.ini')
         if os.path.isfile(app_ini):
             if fl_reset_ini:
                 os.remove(app_ini)
@@ -463,9 +591,30 @@ def init_puzzle(BORDER, PARTS_COLOR, VERSION, fl_reset_ini = False, fl_esc = Fal
 
     return file_ext, fil
 
-def events_check_read_puzzle(events, fl_break, fl_reset, fl_test, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, PANEL, win_caption, file_ext, puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker, auto_marker_ring):
+def resize_puzzle(new_win_width, new_win_height, puzzle_width, puzzle_height, BORDER, PANEL, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines):
+    puzzle_width_, puzzle_height_ = puzzle_width - BORDER * 2, puzzle_height - BORDER * 2
+    original_scale = puzzle_width_ / puzzle_height_
+    width, height = new_win_width - BORDER * 2, new_win_height - PANEL - BORDER * 2
+    screen_scale = width / height
+
+    new_scale = 1
+    if original_scale > screen_scale:
+        new_scale = width / puzzle_width_
+    elif original_scale < screen_scale:
+        new_scale = height / puzzle_height_
+
+    if new_scale != 1:
+        vek_mul, puzzle_width, puzzle_height = align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, new_scale, False, False, False, BORDER)
+        calc_all_spline(puzzle_rings, puzzle_arch, puzzle_parts)
+    else:
+        vek_mul = -1
+
+    WIN_WIDTH, WIN_HEIGHT = new_win_width, new_win_height - PANEL
+    return puzzle_width, puzzle_height, WIN_WIDTH, WIN_HEIGHT, vek_mul
+
+def events_check_read_puzzle(events, fl_break, fl_reset, fl_test, VERSION, BTN_CLICK, BTN_CLICK_STR, BORDER, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, PANEL, win_caption, file_ext, puzzle_name, puzzle_author, puzzle_web_link, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, help, photo, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, dirname, filename, PARTS_COLOR, auto_marker, auto_marker_ring, ctrl_pressed, shift_pressed, resized):
     mouse_x, mouse_y, mouse_left, mouse_right, fil = 0, 0, False, False, ""
-    fl_resize = False
+    fl_resize = fl_screenshot = False
 
     for ev in events:  # Обрабатываем события
         if (ev.type == QUIT):
@@ -479,39 +628,30 @@ def events_check_read_puzzle(events, fl_break, fl_reset, fl_test, VERSION, BTN_C
             photo = 0 if photo == 1 else photo
         if fl_test: continue
 
-        if (ev.type == KEYDOWN and ev.key == K_F1):
-            BTN_CLICK = True
-            BTN_CLICK_STR = "help"
-        if (ev.type == KEYDOWN and ev.key == K_F2):
-            BTN_CLICK = True
-            BTN_CLICK_STR = "reset"
-        if (ev.type == KEYDOWN and ev.key == K_F3):
-            BTN_CLICK = True
-            BTN_CLICK_STR = "open"
-        if (ev.type == KEYDOWN and ev.key == K_F4):
-            BTN_CLICK = True
-            BTN_CLICK_STR = "scramble"
-        if (ev.type == KEYDOWN and ev.key == K_F8):
-            BTN_CLICK = True
-            BTN_CLICK_STR = "superscramble"
-        if (ev.type == KEYDOWN and ev.key == K_F5):
-            BTN_CLICK = True
-            BTN_CLICK_STR = "photo"
-        if (ev.type == KEYDOWN and ev.key == K_F11):
-            BTN_CLICK = True
-            BTN_CLICK_STR = "prev"
-        if (ev.type == KEYDOWN and ev.key == K_F12):
-            BTN_CLICK = True
-            BTN_CLICK_STR = "next"
-        if (ev.type == KEYDOWN and ev.key == K_SPACE):
-            BTN_CLICK = True
-            BTN_CLICK_STR = "undo"
-        if (ev.type == KEYDOWN and ev.key == K_BACKSPACE):
-            BTN_CLICK = True
-            BTN_CLICK_STR = "redo"
+        if (ev.type == KEYDOWN):
+            key_mas     = [K_F1,   K_F2,    K_F3,   K_F4,       K_F5,    K_F6,     K_F7,         K_F8,            K_F9,   K_F11,  K_F12,  K_SPACE, K_BACKSPACE]
+            cammand_mas = ["help", "reset", "open", "scramble", "photo", "marker", "screenshot", "superscramble", "save", "prev", "next", "undo",  "redo"]
+            try: pos = key_mas.index(ev.key)
+            except: pos = -1
+            if pos>=0:
+                BTN_CLICK = True
+                BTN_CLICK_STR = cammand_mas[pos]
+            if (ev.key == pygame.K_o and ctrl_pressed): # Ctrl-O
+                BTN_CLICK,BTN_CLICK_STR = True, "open"
+
+        if (ev.type == KEYDOWN):
+            if (ev.key == K_LCTRL or ev.key == K_RCTRL):
+                ctrl_pressed = True
+            elif (ev.key == K_LSHIFT or ev.key == K_RSHIFT):
+                shift_pressed = True
+        if (ev.type == KEYUP):
+            if (ev.key == K_LCTRL or ev.key == K_RCTRL):
+                ctrl_pressed = False
+            elif (ev.key == K_LSHIFT or ev.key == K_RSHIFT):
+                shift_pressed = False
 
         if BTN_CLICK_STR == "info" and help+photo == 0:
-            for link in puzzle_link:
+            for link in puzzle_web_link:
                 if link != "":
                     webbrowser.open(link, new=2, autoraise=True)
         if BTN_CLICK_STR == "about" and help+photo == 0:
@@ -523,21 +663,41 @@ def events_check_read_puzzle(events, fl_break, fl_reset, fl_test, VERSION, BTN_C
             help = 1 - help
         if BTN_CLICK_STR == "photo":
             photo = 1 - photo
+        if BTN_CLICK_STR == "marker":
+            auto_marker = 1 - auto_marker
+        if BTN_CLICK_STR == "screenshot":
+            fl_screenshot = True
 
-        if BTN_CLICK_STR == "reset" and help+photo == 0:
-            if not file_ext:
+        if (BTN_CLICK_STR == "open" or ev.type == DROPFILE or BTN_CLICK_STR == "prev" or BTN_CLICK_STR == "next" or BTN_CLICK_STR == "reset") and help+photo == 0:
+            if BTN_CLICK_STR == "reset" and (not file_ext):
                 fl_break = fl_reset = True
             else:
-                old_width, old_height = WIN_WIDTH, WIN_HEIGHT
-                fil = read_file(dirname, filename, BORDER, PARTS_COLOR, "reset")
+                if BTN_CLICK_STR == "reset":
+                    old_width, old_height = WIN_WIDTH, WIN_HEIGHT
+                    fil = read_file(dirname, filename, BORDER, PARTS_COLOR, "reset")
+                elif ev.type == DROPFILE:
+                    fl_break = False
+                    fil = read_file("", ev.file, BORDER, PARTS_COLOR, "drop")
+                else:
+                    fl_break = False
+                    fil = read_file(dirname, filename, BORDER, PARTS_COLOR, BTN_CLICK_STR)
+
                 if not fl_test:
                     window_front(win_caption)
 
                 if typeof(fil) != "str":
-                    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, puzzle_kol, vek_mul, dirname, filename, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts, show_hidden_circles = fil
-                    file_ext = fl_break = fl_reset = True
-                    if old_width != WIN_WIDTH or old_height != WIN_HEIGHT:
-                        fl_reset = False
+                    puzzle_name, puzzle_author, puzzle_web_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, puzzle_kol, vek_mul, dirname, filename, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts, show_hidden_circles, moves, moves_stack, fl_load_save = fil
+                    if BTN_CLICK_STR == "reset":
+                        file_ext, fl_break, fl_reset = True, True, True
+                        if old_width != WIN_WIDTH or old_height != WIN_HEIGHT:
+                            fl_reset = False
+                        else:
+                            puzzle_width,puzzle_height,WIN_WIDTH,WIN_HEIGHT,vek_mul = resize_puzzle(WIN_WIDTH, WIN_HEIGHT+PANEL, puzzle_width,puzzle_height, BORDER,PANEL, puzzle_rings,puzzle_arch,puzzle_parts,puzzle_lines)
+                            # fl_resize = True
+                    else:
+                        file_ext, fl_break, fl_reset = True, True, False
+                        if file_ext:
+                            save_state(dirname, filename, VERSION)
                 else:
                     if fil == "break":
                         fl_break, fl_reset, file_ext = True, False, False
@@ -547,64 +707,16 @@ def events_check_read_puzzle(events, fl_break, fl_reset, fl_test, VERSION, BTN_C
                         mb.showerror(message=("Bad puzzle-file: " + fil))
                         if not fl_test:
                             window_front(win_caption)
-        if (BTN_CLICK_STR == "open" or BTN_CLICK_STR == "prev" or BTN_CLICK_STR == "next") and help+photo == 0:
-            fl_break = False
-            fil = read_file(dirname, filename, BORDER, PARTS_COLOR, BTN_CLICK_STR)
-            if not fl_test:
-                window_front(win_caption)
 
-            if typeof(fil) != "str":
-                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, puzzle_kol, vek_mul, dirname, filename, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts, show_hidden_circles = fil
-                file_ext = fl_break = True
-                fl_reset = False
-                if file_ext:
-                    save_state(dirname, filename, VERSION)
-            else:
-                if fil == "break":
-                    fl_break, fl_reset, file_ext = True,False,False
-                elif fil != "-":
-                    if fil == "":
-                        fil = "Unknow error"
-                    mb.showerror(message=("Bad puzzle-file: " + fil))
-                    if not fl_test:
-                        window_front(win_caption)
-        if ev.type == DROPFILE and help+photo == 0:
+        if (BTN_CLICK_STR == "save") and help+photo == 0:
             fl_break = False
-            fil = read_file("", ev.file, BORDER, PARTS_COLOR, "drop")
-            window_front(win_caption)
-
-            if typeof(fil) != "str":
-                puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, puzzle_kol, vek_mul, dirname, filename, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts, show_hidden_circles = fil
-                file_ext = fl_break = True
-                fl_reset = False
-                if file_ext:
-                    save_state(dirname, filename, VERSION)
-            else:
-                if fil == "break":
-                    fl_break, fl_reset, file_ext = True,False,False
-                elif fil != "-":
-                    if fil == "":
-                        fil = "Unknow error"
-                    mb.showerror(message=("Bad puzzle-file: " + fil))
-                    window_front(win_caption)
+            save_puzzle(dirname, filename, puzzle_name, puzzle_author, puzzle_web_link, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, moves_stack)
 
         if ev.type == VIDEORESIZE:
-            puzzle_width_, puzzle_height_ = puzzle_width-BORDER*2, puzzle_height-BORDER*2
-            original_scale = puzzle_width_/puzzle_height_
-            width, height = ev.w-BORDER*2, ev.h-PANEL-BORDER*2
-            screen_scale = width/height
+            puzzle_width,puzzle_height,WIN_WIDTH,WIN_HEIGHT,vek_mul = resize_puzzle(ev.w,ev.h, puzzle_width,puzzle_height, BORDER,PANEL, puzzle_rings,puzzle_arch,puzzle_parts,puzzle_lines)
 
-            new_scale = 1
-            if original_scale>screen_scale:
-                new_scale = width / puzzle_width_
-            elif original_scale<screen_scale:
-                new_scale = height / puzzle_height_
-
-            if new_scale != 1:
-                vek_mul, puzzle_width, puzzle_height = align_cordinates(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, new_scale, False, False, False, BORDER)
-                calc_all_spline(puzzle_rings, puzzle_arch, puzzle_parts)
-
-            WIN_WIDTH, WIN_HEIGHT = ev.w, ev.h-PANEL
+            # root = Tk() # 2 if root.state() == 'zoomed' else 1
+            resized = 1
             fl_resize = True
 
         if ev.type == MOUSEMOTION:
@@ -657,14 +769,15 @@ def events_check_read_puzzle(events, fl_break, fl_reset, fl_test, VERSION, BTN_C
         BTN_CLICK = False
         BTN_CLICK_STR = ""
 
-    fil2 = fl_break, fl_reset, file_ext, fl_resize, BTN_CLICK, BTN_CLICK_STR, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height
+    fil2 = fl_break, fl_reset, file_ext, fl_resize, resized, BTN_CLICK, BTN_CLICK_STR, undo, moves, moves_stack, redo_stack, ring_num, direction, mouse_xx, mouse_yy, mouse_x, mouse_y, mouse_left, mouse_right, help, photo, WIN_WIDTH, WIN_HEIGHT, puzzle_width, puzzle_height, auto_marker, fl_screenshot, ctrl_pressed, shift_pressed
     return fil, fil2
 
-def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
+def read_puzzle_script_and_init_puzzle(lines, dirname, filename, PARTS_COLOR):
     flip_y = flip_x = flip_rotate = skip_check_error = show_hidden_circles = False
-    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker, auto_marker_ring, first_cut, first_coloring = "", "", 1, 2, 0, 0, True, True
-    puzzle_link, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts, copy_parts = [], [], [], [], [], [], [], [], [], [], []
+    puzzle_name, puzzle_author, puzzle_scale, puzzle_speed, auto_marker, auto_marker_ring, auto_renumbering, first_cut, first_coloring, first_arch = "", "", 1, 2, 0, 0, 1, True, True, True
+    puzzle_web_link, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, auto_cut_parts, auto_color_parts, set_color_parts, remove_parts, copy_parts = [], [], [], [], [], [], [], [], [], [], []
     part_num, param_calc, ring_num, line_num = 0, [], 1, 1
+    moves, moves_stack = 0, []
 
     command_mas = expand_script(lines)
 
@@ -712,7 +825,7 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
         elif command == "ShowHiddenCircles".lower():
             show_hidden_circles = True
         elif command == "Link".lower():
-            puzzle_link.append(params)
+            puzzle_web_link.append(params)
         elif command == "Scale".lower():
             puzzle_scale = float(params)
         elif command == "Speed".lower():
@@ -748,11 +861,12 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
         #########################################################################
         # инициализация кругов головоломки
         elif command == "Ring".lower():
-            if not (len(param_mas) == 5 or len(param_mas) == 6): return ("Incorrect 'Ring' parameters. In str=" + str(str_nom))
+            if not (len(param_mas) >= 5 or len(param_mas) <= 7): return ("Incorrect 'Ring' parameters. In str=" + str(str_nom))
             param_mas[1], param_mas[2] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc)
             param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
-            param_mas5 = int(param_mas[5]) if len(param_mas)==6 else 0
-            puzzle_rings.append([ring_num, param_mas[1], param_mas[2], param_mas[3], param_mas[4], 0, param_mas5, [], []])
+            param_mas5 = int(param_mas[5]) if len(param_mas)>=6 else 0
+            param_mas6 = int(param_mas[6]) if len(param_mas)>=7 else 0
+            puzzle_rings.append([ring_num, param_mas[1], param_mas[2], param_mas[3], param_mas[4], 0, param_mas5, [], [param_mas6, []], []])
             ring_num += 1
 
             arch_num = len(puzzle_arch)+1
@@ -760,16 +874,21 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
             check_all_rings(puzzle_rings)
 
         elif command == "CopyRing".lower():
-            if not (len(param_mas) == 5 or len(param_mas) == 6): return ("Incorrect 'CopyRing' parameters. In str=" + str(str_nom))
+            if not (len(param_mas) >= 5 or len(param_mas) <= 7): return ("Incorrect 'CopyRing' parameters. In str=" + str(str_nom))
             param_mas[3], param_mas[4] = calc_param(param_mas[3], param_calc), calc_param(param_mas[4], param_calc)
-            param_mas5 = int(param_mas[5]) if len(param_mas)==6 else 0
+            param_mas5 = int(param_mas[5]) if len(param_mas)>=6 else 0
+            param_mas6 = int(param_mas[6]) if len(param_mas)>=7 else 0
             center_x, center_y = copy_ring(int(param_mas[1]),param_mas[2],puzzle_rings)
-            puzzle_rings.append([ring_num, center_x, center_y, param_mas[3], param_mas[4], 0, param_mas5, [], []])
+            puzzle_rings.append([ring_num, center_x, center_y, param_mas[3], param_mas[4], 0, param_mas5, [], [param_mas6, []], []])
             ring_num += 1
 
             arch_num = len(puzzle_arch)+1
             puzzle_arch.append([arch_num, center_x, center_y, param_mas[3]])
             check_all_rings(puzzle_rings)
+
+        elif command == "Linked".lower():
+            linked_mas = param_mas
+            link_rings(puzzle_rings, linked_mas)
 
         #########################################################################
         # инициализация линий головоломки
@@ -785,25 +904,25 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
 
         elif command == "AutoCutParts".lower():
             auto_cut_parts = param_mas
-            init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_points, auto_cut_parts, first_cut)
+            init_cut_all_ring_to_parts(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_points, auto_cut_parts, auto_renumbering, first_cut)
             first_cut = False
 
         elif command == "MakeCircles".lower():
             make_circles = param_mas
-            make_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, make_circles)
+            make_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, make_circles, True)
             first_cut = False
 
         elif command == "RotateCircles".lower():
             rotate_circles = param_mas
-            rotate_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_points, rotate_circles)
+            rotate_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_points, rotate_circles, auto_renumbering)
 
         elif command == "CutCircles".lower():
             cut_circles = param_mas
-            cut_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, cut_circles)
+            cut_def_circles(puzzle_rings, puzzle_arch, puzzle_parts, cut_circles, auto_renumbering)
 
         elif command == "CutLines".lower():
             cut_lines = param_mas
-            cut_def_lines(puzzle_lines, puzzle_parts, puzzle_arch, cut_lines)
+            cut_def_lines(puzzle_lines, puzzle_parts, puzzle_arch, cut_lines, auto_renumbering)
 
         elif command == "RemoveParts".lower():
             remove_parts = param_mas
@@ -828,6 +947,8 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
 
         elif command == "Renumbering".lower():
             sort_and_renum_all_parts(puzzle_parts)
+        elif command == "AutoRenumbering".lower():
+            auto_renumbering = int(params) if is_number(params) else 1
 
         elif command == "HideParts".lower():
             hide_parts = param_mas
@@ -874,26 +995,114 @@ def read_puzzle_script_and_init_puzzle(lines,PARTS_COLOR):
 
         ########################################################################################
         # блок для загрузки скомпилированной головоломки. загружаем координаты всех частей
-        # elif command == "Arch":
-        #     if len(param_mas) != 4: return ("Incorrect 'Arch' parameters. In str=" + str(str_nom))
-        #     param_mas[1], param_mas[2], param_mas[3] = calc_param(param_mas[1], param_calc), calc_param(param_mas[2], param_calc), calc_param(param_mas[3], param_calc)
-        #     puzzle_arch.append([int(param_mas[0]), param_mas[1], param_mas[2], param_mas[3]])
-        # elif command == "Part":
-        #     if len(param_mas) == 2:
-        #         part_num = int(param_mas[0])
-        #         puzzle_parts.append([part_num, int(param_mas[1]), 1, [], [], [], [], [], 0])
-        #     else:
-        #         return ("Incorrect 'Part' parameters. In str=" + str(str_nom))
-        # elif command == "PartArch":
-        #     if len(param_mas) == 4 and part_num > 0:
-        #         part = find_element(part_num, puzzle_parts)
-        #         param_mas[2], param_mas[3] = calc_param(param_mas[2], param_calc), calc_param(param_mas[3], param_calc)
-        #         part_arch = part[5]
-        #         part_arch.append([int(param_mas[0]), 1, int(param_mas[1]), param_mas[2], param_mas[3], 0])
-        #     else:
-        #         return ("Incorrect 'PartArch' parameters. In str=" + str(str_nom))
 
-    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, auto_cut_parts, auto_color_parts, auto_marker, auto_marker_ring, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error, show_hidden_circles
+        elif command == "DirName".lower():
+            dirname = params.replace("\"","")
+        elif command == "PuzzleFile".lower():
+            filename = params.replace("\"","")
+
+        elif command == "MovesStack".lower():
+            for move in param_mas:
+                moves_stack.append([int(move[0]),int(move[1])])
+            moves = len(moves_stack)
+
+        elif command == "Arch".lower():
+            if first_arch:
+                puzzle_arch, first_arch = [], False
+            if len(param_mas) != 4: return ("Incorrect 'Arch' parameters. In str=" + str(str_nom))
+            puzzle_arch.append([int(param_mas[0]), float(param_mas[1]), float(param_mas[2]), float(param_mas[3])])
+        elif command == "Part".lower():
+            if len(param_mas) == 3:
+                part_num = int(param_mas[0])
+                puzzle_parts.append([part_num, int(param_mas[1]), int(param_mas[2]), [], [], [], [], [], 0])
+            else:
+                return ("Incorrect 'Part' parameters. In str=" + str(str_nom))
+        elif command == "PartMarker".lower():
+            if len(param_mas) == 5 and part_num > 0:
+                part = find_element(part_num, puzzle_parts)
+                part[3] = [param_mas[0], float(param_mas[1]), float(param_mas[2]), float(param_mas[3]), float(param_mas[4]), ""]
+            else:
+                return ("Incorrect 'PartArch' parameters. In str=" + str(str_nom))
+        elif command == "PartArch".lower():
+            if len(param_mas) == 5 and part_num > 0:
+                part = find_element(part_num, puzzle_parts)
+                part_arch = part[5]
+                part_arch.append([int(param_mas[0]), int(param_mas[1]), int(param_mas[2]), float(param_mas[3]), float(param_mas[4]), 0])
+            else:
+                return ("Incorrect 'PartArch' parameters. In str=" + str(str_nom))
+
+    return puzzle_name, puzzle_author, puzzle_web_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, auto_cut_parts, auto_color_parts, auto_marker, auto_marker_ring, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error, show_hidden_circles, dirname, filename, moves, moves_stack
+
+def test_mode_screenshot(game_scr, puzzle_name,puzzle_rings,puzzle_arch,puzzle_parts,puzzle_points, fl_test, fl_test_photo, fl_test_scramble, fl_screenshot, count_test_scramble, photo_screen, dir_screenshots, sub_folder, GAME, PHOTO, BORDER):
+    if fl_test:
+        if count_test_scramble == 0:
+            # сохраним скрин решенной головоломки
+            if sub_folder != "":
+                if not os.path.isdir(dir_screenshots + sub_folder):
+                    os.mkdir(dir_screenshots + sub_folder)
+            screenshot = os.path.join(dir_screenshots + sub_folder, puzzle_name + ".jpg")
+            pygame.image.save(game_scr, screenshot)
+
+            # сохраним скрин с открытым фото реальной головоломки
+            if fl_test_photo and photo_screen != "":
+                game_scr.blit(photo_screen, (GAME[0] - PHOTO[0] - BORDER // 3, BORDER // 3))
+                draw.rect(game_scr, Color("#B88800"), (GAME[0] - PHOTO[0] - 2 * (BORDER // 3), 0, PHOTO[0] + 2 * (BORDER // 3), PHOTO[1] + 2 * (BORDER // 3)), BORDER // 3)
+                screenshot2 = os.path.join(dir_screenshots + sub_folder, puzzle_name + " (photo).jpg")
+                pygame.image.save(game_scr, screenshot2)
+
+        if fl_test_scramble > 0:
+            # сохраним скрин запутанной головоломки
+            if count_test_scramble > 0:
+                screenshot = os.path.join(dir_screenshots + sub_folder, puzzle_name + " (scramble " + str(count_test_scramble) + ").jpg")
+                pygame.image.save(game_scr, screenshot)
+            if count_test_scramble < fl_test_scramble:
+                scramble_puzzle(puzzle_rings, puzzle_arch, puzzle_parts, puzzle_points, "scramble")
+                count_test_scramble += 1
+                return True
+        return False
+    elif fl_screenshot:
+        # сохраним скрин решенной головоломки
+        if not os.path.isdir(dir_screenshots):
+            os.mkdir(dir_screenshots)
+        screenshot = os.path.join(dir_screenshots, puzzle_name + ".jpg")
+        pygame.image.save(game_scr, screenshot)
+
+        # скопируем скрин в буфер обмена
+        send_to_clipboard(screenshot)
+    return True
+
+def draw_all_markers(game_scr, puzzle_parts,puzzle_rings, auto_marker,auto_marker_ring, BLACK_COLOR,WHITE_COLOR,RED_COLOR):
+    for nn, part in enumerate(puzzle_parts):
+        marker_sprite = ""
+        marker_color = BLACK_COLOR if part[1] != 1 else WHITE_COLOR
+        center_x, center_y, area, max_radius = part[4]
+        if auto_marker:
+            marker_sprite, _ = ptext.draw(str(part[0]), (0, 0), color=marker_color, fontsize=10, sysfontname='Verdana', align="center")
+        elif len(part[3]) != 0:
+            marker_text, marker_angle, marker_size, marker_horizontal_shift, marker_vertical_shift, marker_sprite = part[3]
+            center_x += marker_horizontal_shift
+            center_y -= marker_vertical_shift
+            if marker_sprite == "":
+                if marker_size == 0:
+                    marker_size = int(area / 200)
+                fontname = 'Verdana'
+                if "↑↓→←".find(marker_text) >= 0:
+                    fontname = 'Arial'
+                    marker_sprite, _ = ptext.draw(marker_text, (0, 0), color=marker_color, fontsize=marker_size, fontname="fonts/arialn.ttf", align="center")
+                else:
+                    marker_sprite, _ = ptext.draw(marker_text, (0, 0), color=marker_color, fontsize=marker_size, sysfontname=fontname, align="center")
+                part[3][5] = marker_sprite
+            marker_sprite = pygame.transform.rotate(marker_sprite, marker_angle)
+        if marker_sprite != "":
+            text_marker_place = marker_sprite.get_rect(center=(center_x, center_y))
+            game_scr.blit(marker_sprite, text_marker_place)  # Пишем маркер
+    if auto_marker_ring:
+        for nn, ring in enumerate(puzzle_rings):
+            if ring[6] != 0: continue
+            center_x, center_y = ring[1], ring[2]
+            text_marker, _ = ptext.draw(str(ring[0]), (0, 0), color=RED_COLOR, fontsize=20, sysfontname='Verdana', align="center", owidth=1, ocolor="blue")
+            text_marker_place = text_marker.get_rect(center=(center_x, center_y))
+            game_scr.blit(text_marker, text_marker_place)  # Пишем маркер
 
 def calc_all_spline(puzzle_rings, puzzle_arch, puzzle_parts):
     # построение границ деталек
@@ -904,11 +1113,11 @@ def calc_all_spline(puzzle_rings, puzzle_arch, puzzle_parts):
     for ring in puzzle_rings:
         shift = 4
         arch_mas = [[ring[1], ring[2] + ring[3] + shift], [ring[1], ring[2] + ring[3] + shift]]
-        ring[8], _ = calc_arch_spline(arch_mas, ring[1], ring[2], ring[3] + shift, 1)
+        ring[9], _ = calc_arch_spline(arch_mas, ring[1], ring[2], ring[3] + shift, 1)
 
 def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     # загрузка файла
-    lines, puzzle_kol, dirname, filename, error_str = load_puzzle(fl, init, dirname, filename)
+    lines, puzzle_kol, dirname, filename, fl_load_save, error_str = load_puzzle(fl, init, dirname, filename)
     if error_str != "": return error_str
 
     mouse.set_cursor(SYSTEM_CURSOR_WAITARROW)
@@ -916,9 +1125,9 @@ def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     display.set_caption("Please wait! Loading ...")
 
     # прочитаем строки файла
-    fil = read_puzzle_script_and_init_puzzle(lines, PARTS_COLOR)
+    fil = read_puzzle_script_and_init_puzzle(lines, dirname, filename, PARTS_COLOR)
     if typeof(fil) == "str": return fil
-    puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, auto_cut_parts, auto_color_parts, auto_marker, auto_marker_ring, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error, show_hidden_circles = fil
+    puzzle_name, puzzle_author, puzzle_web_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, auto_cut_parts, auto_color_parts, auto_marker, auto_marker_ring, set_color_parts, remove_parts, copy_parts, flip_y, flip_x, flip_rotate, skip_check_error, show_hidden_circles, dirname, filename, moves, moves_stack = fil
 
     remove_dublikate_parts(puzzle_parts)
 
@@ -937,4 +1146,4 @@ def read_file(dirname, filename, BORDER, PARTS_COLOR, fl, init=""):
     if typeof(win_caption)=="str":
         display.set_caption(win_caption)
 
-    return puzzle_name, puzzle_author, puzzle_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, puzzle_kol, vek_mul, dirname, filename, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts, show_hidden_circles
+    return puzzle_name, puzzle_author, puzzle_web_link, puzzle_scale, puzzle_speed, puzzle_rings, puzzle_arch, puzzle_parts, puzzle_lines, puzzle_points, puzzle_kol, vek_mul, dirname, filename, puzzle_width, puzzle_height, auto_marker, auto_marker_ring, remove_parts, copy_parts, show_hidden_circles, moves, moves_stack, fl_load_save

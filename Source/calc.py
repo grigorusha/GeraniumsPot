@@ -472,3 +472,150 @@ def check_line_intersect(px1,py1, qx1,qy1, px2,py2, qx2,qy2):
     if ((o4 == 0) and on_segment(px2,py2, qx1,qy1, qx2,qy2)): return True
 
     return False
+
+def calc_spline(input_mas, closed=True):
+    def check_in_line(x1,y1,x2,y2,x,y):
+        return compare_xy( (x-x1)*(y2-y1), (x2-x1)*(y-y1), -1 )
+
+    def check_in_circle(x0,y0,x2,y2,x4,y4,x6,y6):
+        # применим терему косинусов
+        aa = calc_length(x2,y2, x4,y4)
+        bb = calc_length(x2,y2, x0,y0)
+        cc = calc_length(x4,y4, x0,y0)
+        cosA1 = (bb*bb + cc*cc - aa*aa) / 2*bb*cc
+
+        bb = calc_length(x2,y2, x6,y6)
+        cc = calc_length(x4,y4, x6,y6)
+        cosA2 = (bb*bb + cc*cc - aa*aa) / 2*bb*cc
+
+        return compare_xy( cosA1, cosA2, -1 )
+
+    def find_center_circle(x1, y1, x2, y2, x3, y3):
+        if check_in_line(x1, y1, x2, y2, x3, y3):
+            px, py, pr = (x1 + x3) / 2, (y1 + y3) / 2, 0
+        else:
+            c = (x1 - x2) ** 2 + (y1 - y2) ** 2
+            a = (x2 - x3) ** 2 + (y2 - y3) ** 2
+            b = (x3 - x1) ** 2 + (y3 - y1) ** 2
+            s = 2 * (a * b + b * c + c * a) - (a * a + b * b + c * c)
+            px = (a * (b + c - a) * x1 + b * (c + a - b) * x2 + c * (a + b - c) * x3) / s
+            py = (a * (b + c - a) * y1 + b * (c + a - b) * y2 + c * (a + b - c) * y3) / s
+            ar,br,cr = sqrt(a),sqrt(b),sqrt(c)
+            pr = ar * br * cr / ((ar + br + cr) * (-ar + br + cr) * (ar - br + cr) * (ar + br - cr)) ** 0.5
+        return px,py,pr
+
+    step = 1
+    input_xy = input_mas.copy()
+    if closed:
+        if input_xy[0][0]==input_xy[-1][0] and input_xy[0][1]==input_xy[-1][1]:
+            input_xy.pop()
+
+    fl_iter, iter = True, 0
+    while fl_iter:
+        fl_iter, iter = False, iter+1
+        mas_xy, len_mas = [], len(input_xy)
+        for nn in range(len_mas):
+            mas_xy.append( [input_xy[nn][0],input_xy[nn][1]] )
+
+            if not closed and (nn==0 or nn==len_mas-2):
+                # построение начала и конца разомкнутой кривой
+                if nn==0:
+                    x0, y0 = mas_pos(input_xy,nn)
+                    x2, y2 = mas_pos(input_xy,nn+1)
+                    x4, y4 = mas_pos(input_xy,nn+2)
+                else:
+                    x0, y0 = mas_pos(input_xy, nn+1)
+                    x2, y2 = mas_pos(input_xy, nn)
+                    x4, y4 = mas_pos(input_xy, nn-1)
+
+                len_vek = calc_length(x0,y0,x2,y2)
+                if len_vek>step:
+                    if check_in_line(x2,y2,x4,y4,x0,y0):
+                        # если 4 точки на одной прямой линии, то найдем середину отрезка
+                        x1,y1 = (x2 + x0)/2, (y2 + y0)/2
+                    else:
+                        x1,y1 = (x0*3 + x2*6 - x4)/8, (y0*3 + y2*6 - y4)/8
+                    mas_xy.append( [x1,y1] )
+                    fl_iter = True
+            elif not closed and nn==len_mas-1:
+                pass
+
+            else: # построение центральной части замкнутой кривой
+                x0,y0 = mas_pos(input_xy,nn-1)
+                x2,y2 = mas_pos(input_xy,nn)
+                x4,y4 = mas_pos(input_xy,nn+1)
+                x6,y6 = mas_pos(input_xy,nn+2)
+
+                len_vek = calc_length(x2,y2,x4,y4)
+                if len_vek>step:
+                    if check_in_line(x2,y2,x4,y4,x0,y0) and check_in_line(x2,y2,x4,y4,x6,y6):
+                        # если 4 точки на одной прямой линии, то найдем середину отрезка
+                        x3,y3 = (x2 + x4)/2, (y2 + y4)/2
+                    elif ( check_in_line(x2, y2, x4, y4, x0, y0) or check_in_line(x2, y2, x4, y4, x6, y6) ) and iter<3:
+                        # если 3 точки на одной прямой линии, и первые шаги итераций , то найдем середину отрезка
+                        x3, y3 = (x2 + x4) / 2, (y2 + y4) / 2
+                    elif check_in_circle(x0,y0,x2,y2,x4,y4,x6,y6):
+                        xx1, yy1 = -(x0 - x2), -(y0 - y2)
+                        xx2, yy2 = x4 - x2, y4 - y2
+                        multiVec = xx1 * yy2 - xx2 * yy1
+                        direction = 1 if multiVec < 0 else -1
+
+                        # если 4 точки на одной окружности, то найдем середину дуги
+                        px,py, pr = find_center_circle(x0,y0,x2,y2,x4,y4)
+
+                        angle2, grad2 = calc_angle(px,py, x2,y2, pr)
+                        angle4, grad4 = calc_angle(px,py, x4,y4, pr)
+
+                        angle3, grad3 = (angle2 + angle4) / 2, (grad2 + grad4) / 2
+                        if (angle2<angle4 and direction==1) or (angle2>angle4 and direction==-1):
+                            angle3, grad3 = (angle2 + angle4 - 2*pi) / 2, (grad2 + grad4 - 360) / 2
+
+                        angle_cos, angle_sin = cos(angle3), sin(angle3)
+                        x3, y3 = angle_cos * pr + px, angle_sin * pr + py
+
+                    else:
+                        x3,y3 = (-x0 + x2*9 + x4*9 - x6)/16, (-y0 + y2*9 + y4*9 - y6)/16
+                    mas_xy.append( [x3,y3] )
+                    fl_iter = True
+
+        input_xy = mas_xy.copy()
+    return mas_xy
+
+# def calc_countur(input_xy, shift):
+#     shift_xy1, shift_xy2, shift_x1, shift_y1, shift_x2, shift_y2, spline_sh1, spline_sh2 = [], [], [], [], [], [], [], []
+#     shift_out, shift_in = shift + 5, shift + 2
+#     for nn, pos_xy in enumerate(input_xy):
+#         xx0, yy0 = pos_xy
+#         if nn + 1 == len(input_xy):
+#             xx_next, yy_next = input_xy[0]
+#         else:
+#             xx_next, yy_next = input_xy[nn + 1]
+#         xx_pred, yy_pred = input_xy[nn - 1]
+#
+#         ang_next, grd_next = calc_angle(xx0, yy0, xx_next, yy_next)
+#         ang_pred, grd_pred = calc_angle(xx0, yy0, xx_pred, yy_pred)
+#
+#         ang11, ang22, grd11, grd22 = (ang_next + ang_pred) / 2, pi + (ang_next + ang_pred) / 2, (grd_next + grd_pred) / 2, 180 + (grd_next + grd_pred) / 2
+#
+#         if ang_next > ang_pred:
+#             ang22 -= 2 * pi
+#             grd22 -= 360
+#             ang11, ang22 = ang22, ang11
+#             grd11, grd22 = grd22, grd11
+#
+#         sh_x1, sh_y1 = shift_in * cos(ang11) + xx0, shift_in * sin(ang11) + yy0
+#         sh_x2, sh_y2 = shift_out * cos(ang22) + xx0, shift_in * sin(ang22) + yy0
+#
+#         shift_xy1.append((sh_x1, sh_y1))
+#         shift_xy2.append((sh_x2, sh_y2))
+#
+#     spline_sh1, spline_sh2 = calc_spline(shift_xy1), calc_spline(shift_xy2)
+#
+#     center_x, center_y = centroid(input_xy)
+#     spline_len1 = calc_len_polygon(shift_xy1)
+#     spline_len2 = calc_len_polygon(shift_xy2)
+#
+#     if spline_len1 < spline_len2:
+#         orbit_mas.append([nom, orbit_len, input_xy, spline_xy, spline_mas, shift_xy1, spline_sh1, shift_xy2, spline_sh2, (center_x, center_y)])
+#     else:
+#         orbit_mas.append([nom, orbit_len, input_xy, spline_xy, spline_mas, shift_xy2, spline_sh2, shift_xy1, spline_sh1, (center_x, center_y)])
