@@ -30,6 +30,7 @@ You can download the Gallery.zip file to see all the screenshots of all the puzz
 - **F6** - toggle markers
 - **F7** - make screenshot and copy to clipboard
 - **F8** - automatic super-scramble
+- **F9** - save to file puzzle state and moves stack
 - **F11** - previous puzzle
 - **F12** - next puzzle
 ### Programm button
