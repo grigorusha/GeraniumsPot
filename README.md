@@ -24,7 +24,7 @@ You can download the Gallery.zip file to see all the screenshots of all the puzz
 - **Space** - back one step
 - **F1** - opens a small hint window showing the initial state of the puzzle.
 - **F2** - reset the puzzle to its initial state.
-- **F3** - opening a file with a new circles-puzzle
+- **F3** - opening a file with a new circles-puzzle (also Ctrl+O)
 - **F4** - automatic scramble puzzle
 - **F5** - opens a small window showing the photo with real puzzle.
 - **F6** - toggle markers
