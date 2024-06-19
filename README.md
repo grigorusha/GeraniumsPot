@@ -1,8 +1,8 @@
 # Geraniums Pot - Intersecting Circles Puzzles Simulator
 
-This is a simulator of the famous "Geranium" puzzles.  I added 454 different puzzles.
+This is a simulator of the famous "Geranium" puzzles.  I added 495 different puzzles.
 
-### **<a href="https://github.com/grigorusha/GeraniumsPot/releases/">Download win-installer for Geraniums Pot Simulator</a>** 
+### **<a href="https://github.com/grigorusha/GeraniumsPot/releases/">Download win-installer or linux-app for Geraniums Pot Simulator</a>** 
 ![](https://i.imgur.com/Z9xLTeo.png)
 [![Download Geraniums Pot](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/geraniumspot/files/latest/download)
 
