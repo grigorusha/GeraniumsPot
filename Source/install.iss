@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Geraniums Pot"
-#define MyAppVersion "1.9.1"
+#define MyAppVersion "1.9.2"
 #define MyAppPublisher "Evgeniy Grigoriev"
 #define MyAppURL "https://github.com/grigorusha/GeraniumsPot"
 #define MyAppExeName "Geraniums Pot.exe"
