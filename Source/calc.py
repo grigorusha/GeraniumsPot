@@ -1,5 +1,7 @@
 from math import pi, sqrt, cos, sin, tan, acos, asin, atan, exp, pow, radians, degrees, hypot
 
+from syst import typeof
+
 def compare_xy(x, y, rr):
     # сравнение двух величин, с учетом погрешности
     return round(abs(x - y), rr) <= 10**(-rr)
@@ -16,8 +18,13 @@ def sign(x):
 def find_element(pos, mas):
     # поиск элемента массива по номеру (индекс в первой ячейке)
     for elem in mas:
-        if elem[0] == pos:
-            return elem
+        if typeof(elem)=="list":
+            if elem[0] == pos:
+                return elem
+        elif typeof(elem)=="dict":
+            if elem["num"] == pos:
+                return elem
+
     return ""
 
 def mas_pos(mas_xy, pos):
@@ -105,10 +112,10 @@ def calc_centroid(polygon):
 
 def check_polygon(polygon, centroid, x, y):
     # проверка попадает ли точка внутрь полигона
-    if len(centroid)==0:
+    if len(centroid):
         center_x, center_y = calc_centroid(polygon)
     else:
-        center_x, center_y, _,_ = centroid
+        center_x, center_y = centroid["center_x"], centroid["center_y"]
     length = calc_length(center_x, center_y, x, y)
 
     odd = False
@@ -127,42 +134,12 @@ def check_circle(center_x, center_y, x, y, rad, nn=2):
     # проверка попадает ли точка внутрь окружности, лежит ли она на окружности с небольшой погрешностью
     length = calc_length(center_x, center_y, x, y)
     in_ring = length/rad if rad != 0 else 0
-    return (length<=rad, compare_xy(in_ring, 1, nn), in_ring, abs(rad-length))
 
-def binary_search(mas_points, x,y):
-    low,mid,high = 0,0,len(mas_points)-1
+    result = dict(in_circle=length<=rad, on_ring=compare_xy(in_ring, 1, nn), proporce_cent=in_ring, distance_ring=abs(rad-length))
+    return result
+    # return (length<=rad, compare_xy(in_ring, 1, nn), in_ring, abs(rad-length))
 
-    while low <= high:
-        mid = (high + low) // 2
-        point = mas_points[mid]
-
-        if compare_xy(x, point[0], 8):
-            if compare_xy(y, point[1], 8):
-                return mid,mid
-            elif point[1] < y:
-                low = mid + 1
-            elif point[1] > y:
-                high = mid - 1
-        else:
-            if point[0] < x:
-                low = mid + 1
-            elif point[0] > x:
-                high = mid - 1
-    return -1,mid
-
-def find_rotated_point(x, y, center_x, center_y, angle, puzzle_points):
-    nn,pp = binary_search(puzzle_points, x, y)
-    if nn>=0:
-        mm = 0
-        mas_new_pos = puzzle_points[nn][2]
-        for center_x2,center_y2,angle2,_,_ in mas_new_pos:
-            if compare_xy(center_x,center_x2,8) and compare_xy(center_y,center_y2,8) and compare_xy(angle,angle2,8):
-                return nn,mm,pp
-            mm += 1
-        return nn,-1,pp
-    return -1,-1,pp
-
-def rotate_point(x, y, center_x, center_y, angle, puzzle_points, fl_find_point = True):
+def rotate_point(x, y, center_x, center_y, angle):
     # поворот точки относительно центра координат по часовой стрелке
     adjusted_x, adjusted_y = x - center_x, y - center_y
     cos_rad, sin_rad = cos(angle), sin(angle)
@@ -172,8 +149,47 @@ def rotate_point(x, y, center_x, center_y, angle, puzzle_points, fl_find_point =
     qx, qy = round(qx, 10), round(qy, 10)
     return qx, qy
 
+    ## puzzle_points - [x, y, [mas_new_coordinate]]
+    ##      mas_new_coordinate - [center_x, center_y, angle, rotated_x, rotated_y]
+    ##      кэш новых координат точек после поворота. у одной точки могут быть несколько новых позиций
+    ##      (как выяснил кэширование работает медленнее, чем просто расчет тригонометрии - отключил)
+
     # # сначала поищем точку в кэше - как выяснил кэширование работает медленнее, чем просто расчет тригонометрии
     # # puzzle_points - [x, y, [center_x, center_y, angle, rotated_x, rotated_y]]
+    #
+    # def binary_search(mas_points, x, y):
+    #     low, mid, high = 0, 0, len(mas_points) - 1
+    #
+    #     while low <= high:
+    #         mid = (high + low) // 2
+    #         point = mas_points[mid]
+    #
+    #         if compare_xy(x, point[0], 8):
+    #             if compare_xy(y, point[1], 8):
+    #                 return mid, mid
+    #             elif point[1] < y:
+    #                 low = mid + 1
+    #             elif point[1] > y:
+    #                 high = mid - 1
+    #         else:
+    #             if point[0] < x:
+    #                 low = mid + 1
+    #             elif point[0] > x:
+    #                 high = mid - 1
+    #     return -1, mid
+    #
+    # def find_rotated_point(x, y, center_x, center_y, angle, puzzle_points):
+    #     nn, pp = binary_search(puzzle_points, x, y)
+    #     if nn >= 0:
+    #         mm = 0
+    #         mas_new_pos = puzzle_points[nn][2]
+    #         for center_x2, center_y2, angle2, _, _ in mas_new_pos:
+    #             if compare_xy(center_x, center_x2, 8) and compare_xy(center_y, center_y2, 8) and compare_xy(angle, angle2, 8):
+    #                 return nn, mm, pp
+    #             mm += 1
+    #         return nn, -1, pp
+    #     return -1, -1, pp
+    #
     # if fl_find_point:
     #     pos,pos2,pos3 = find_rotated_point(x, y, center_x, center_y, angle, puzzle_points)
     # else:
@@ -394,6 +410,7 @@ def check_point_in_arch(p1x, p1y, p2x, p2y, ax, ay, cx, cy, anti):
     return False
 
 def calc_center_arch(x1, y1, x3, y3, arch_x, arch_y, arch_r, direction=1):
+    # найдем точку в центре дуги
     angle1, grad1 = calc_angle(arch_x, arch_y, x1, y1, arch_r)
     angle3, grad3 = calc_angle(arch_x, arch_y, x3, y3, arch_r)
 
@@ -412,18 +429,6 @@ def find_angle_direction(p2x, p2y, p1x, p1y, cx, cy):
     x2, y2 = p2x - cx, p2y - cy
     s12 = sign(x1 * y2 - y1 * x2)
     return 1 if s12>=0 else -1
-
-def get_command(cut_command):
-    command = cut_command.upper()
-    pos = command.find("R")
-    pos = pos if pos >= 0 else command.find("L")
-    if pos < 0 or len(command) < 2: return 0, 0, 0
-
-    num_ring = int(command[0:pos])
-    direction = 1 if command[pos].upper() == "R" else -1 if command[pos].upper() == "L" else 0
-    if direction == 0: return 0, 0, 0
-    step = 1 if len(command) == pos + 1 else int(command[pos + 1:])
-    return num_ring, direction, step
 
 def check_line_intersect(px1,py1, qx1,qy1, px2,py2, qx2,qy2):
     # https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
@@ -580,6 +585,37 @@ def calc_spline(input_mas, closed=True):
 
         input_xy = mas_xy.copy()
     return mas_xy
+
+def calc_speed(puzzle_speed,angle_rotate,radius):
+    if angle_rotate >= 270:
+        p_speed = puzzle_speed * 8
+    elif angle_rotate >= 180:
+        p_speed = puzzle_speed * 6
+    elif angle_rotate >= 130:
+        p_speed = puzzle_speed * 5
+    elif angle_rotate >= 90:
+        p_speed = puzzle_speed * 4
+    else:
+        p_speed = puzzle_speed * 2
+
+    if radius >= 1000:
+        p_speed *= 7
+    elif radius >= 800:
+        p_speed *= 5
+    elif radius >= 600:
+        p_speed *= 4
+    elif radius >= 500:
+        p_speed *= 3.5
+    elif radius >= 400:
+        p_speed *= 3
+    elif radius >= 300:
+        p_speed *= 2.5
+    elif radius >= 200:
+        p_speed *= 2
+    elif radius >= 100:
+        p_speed *= 1.5
+
+    return p_speed
 
 # def calc_countur(input_xy, shift):
 #     shift_xy1, shift_xy2, shift_x1, shift_y1, shift_x2, shift_y2, spline_sh1, spline_sh2 = [], [], [], [], [], [], [], []

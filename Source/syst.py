@@ -1,10 +1,5 @@
-import pygame
-
-from tkinter import Tk
 import os,sys
-
-from math import pi, sqrt, cos, sin, tan, acos, asin, atan, atan2, exp, pow, radians, degrees, hypot
-from calc import mas_pos,calc_spline
+from tkinter import Tk
 
 def check_os_platform():
     import platform
@@ -48,53 +43,6 @@ def calc_param(elem, param_calc):
 
     return elem
 
-def draw_smooth_gear(screen, color, cir_x, cir_y, radius, teeth):
-    def draw_arc(screen, color, center, start, end, radius):
-        angle_start = degrees(atan2(start[1] - center[1], start[0] - center[0]))
-        angle_end = degrees(atan2(end[1] - center[1], end[0] - center[0]))
-        if angle_end < angle_start:
-            angle_end += 360
-        pygame.draw.arc(screen, color, (center[0] - radius, center[1] - radius, radius * 2, radius * 2), radians(angle_start), radians(angle_end), 2)
-
-    for i in range(teeth):
-        angle0 = (i-1) * 2*pi / teeth
-        angle1 = i * 2*pi / teeth
-        angle2 = (i+1) * 2*pi / teeth
-        x0 = int(cir_x + radius * cos(angle0))
-        y0 = int(cir_y + radius * sin(angle0))
-        x1 = int(cir_x + radius * cos(angle1))
-        y1 = int(cir_y + radius * sin(angle1))
-        x2 = int(cir_x + radius * cos(angle2))
-        y2 = int(cir_y + radius * sin(angle2))
-        draw_arc(screen, color, (x1,y1), (x0,y0), (x2,y2), radius)
-        # pygame.draw.circle(screen, color, (x_i, y_i), 3, 2)
-
-def draw_smoth_polygon(surface, color, polygon, width):
-    # рисуем плавную кривую с пиксельным сглаживанием
-    # заменяем pygame.draw.polygon - тк там грубая пиксельная ступенька
-    for nn, p1 in enumerate(polygon):
-        p2 = mas_pos(polygon, nn + 1)
-
-        # delta vector
-        d = (p2[0] - p1[0], p2[1] - p1[1])
-        # distance between the points
-        dis = hypot(*d)
-        # scaled perpendicular vector (vector from p1 & p2 to the polygon's points)
-        if dis != 0:
-            sp = (-d[1] * width / (2 * dis), d[0] * width / (2 * dis))
-        else:
-            sp = (0,0)
-
-        # points
-        p1_1 = (p1[0] - sp[0], p1[1] - sp[1])
-        p1_2 = (p1[0] + sp[0], p1[1] + sp[1])
-        p2_1 = (p2[0] - sp[0], p2[1] - sp[1])
-        p2_2 = (p2[0] + sp[0], p2[1] + sp[1])
-
-        # draw two line
-        pygame.draw.aaline(surface, color, p1_1, p1_2, 1)
-        pygame.draw.aaline(surface, color, p2_1, p2_2, 1)
-
 def keyboard_press(key):
     if check_os_platform()!="windows": return
 
@@ -136,6 +84,18 @@ def window_front(win_caption):
             Tk().withdraw()
             break
 
+def is_window_maximized():
+    if check_os_platform()!="windows": return
+
+    import win32gui,win32con
+    hwnd = win32gui.GetForegroundWindow()
+
+    # Получаем информацию о размещении окна
+    placement = win32gui.GetWindowPlacement(hwnd)
+
+    # placement[1] содержит состояние окна
+    return placement[1] == win32con.SW_MAXIMIZE
+
 def typeof(your_var):
     if (isinstance(your_var, int)):
         return 'int'
@@ -143,6 +103,8 @@ def typeof(your_var):
         return 'float'
     elif (isinstance(your_var, list)) or (isinstance(your_var, tuple)):
         return 'list'
+    elif (isinstance(your_var, dict)):
+        return 'dict'
     elif (isinstance(your_var, bool)):
         return 'bool'
     elif (isinstance(your_var, str)):
@@ -160,31 +122,6 @@ def is_number(s):
         except ValueError:
             return False
     return True
-
-def find_photo(puzzle_name, PHOTO):
-    photo_screen, photo_path = "", ""
-    dir = os.path.join(os.path.abspath(os.curdir),"Photo")
-    if os.path.isdir(dir):
-        for root, dirs, files in os.walk(dir):
-            for fil in files:
-                if (fil.lower() == puzzle_name.lower() + ".jpg") or (fil.lower() == puzzle_name.lower() + ".jpeg") or (fil.lower() == puzzle_name.lower() + ".png"):
-                    photo_path = os.path.join(root,fil)
-                    break
-            if photo_path != "": break
-        if os.path.isfile(photo_path):
-            photo_screen = pygame.image.load(photo_path)
-            photo_rect = (photo_screen.get_rect().width, photo_screen.get_rect().height)
-            if photo_rect[0] / photo_rect[1] <= PHOTO[0] / PHOTO[1]:
-                scale_ko = PHOTO[1] / photo_rect[1]
-                new_width = int(scale_ko * photo_rect[0])
-                PHOTO = (new_width, PHOTO[1])
-            else:
-                scale_ko = PHOTO[0] / photo_rect[0]
-                new_height = int(scale_ko * photo_rect[1])
-                PHOTO = (PHOTO[0], new_height)
-
-            photo_screen = pygame.transform.scale(photo_screen, PHOTO)
-    return photo_screen, PHOTO
 
 def close_spalsh_screen():
     if check_os_platform() != "windows": return
@@ -251,3 +188,81 @@ def arg_param_check():
     if fl_test_scramble==1: fl_test = True
 
     return fl_reset_ini, fl_test, fl_test_photo, fl_test_scramble, dir_garden, dir_screenshots
+
+def parse_parameters(input_string):
+    # рекурсивно обрабатывает строку со вложенным списком и возвращает в виде вложенного массива
+    result, current_param, depth = [], "", 0
+    for char in input_string:
+        if char == ',' and depth == 0:
+            current_param = current_param.strip()
+            if current_param: result.append(current_param.strip())
+            current_param = ""
+        else:
+            current_param += char
+            if char == '(':
+                depth += 1
+            elif char == ')':
+                depth -= 1
+    current_param = current_param.strip()
+    if current_param: result.append(current_param.strip())
+
+    # Обработка вложенных параметров
+    def parse_nested(params):
+        parsed = []
+        for param in params:
+            if param.startswith('(') and param.endswith(')'):
+                inner_params = parse_parameters(param[1:-1])  # Убираем внешние скобки
+                parsed.append(inner_params)
+            else:
+                parsed.append(param)
+        return parsed
+
+    return parse_nested(result)
+
+def parse_cycle(param_mas, depth = 1):
+    # рекурсивно обрабатывает массив, и разворачивает конструкции вида (1,2,3),Х
+    while True:
+        nn, res_mas = 0, []
+        while nn<len(param_mas):
+            par1=param_mas[nn]
+            if typeof(par1)=="list":
+                param_mas[nn] = par1 = parse_cycle(par1, depth+1)
+                if nn+1<=len(param_mas)-1:
+                    par2 = param_mas[nn+1]
+                    if typeof(par1)=="list" and is_number(par2) and depth>1:
+                        count, par0 = int(par2), []
+                        for _ in range(count):
+                            par0.extend(par1)
+                        res_mas.extend(par0)
+                        nn += 2
+                        continue
+            res_mas.append(par1)
+            nn += 1
+        if len(param_mas) == len(res_mas): break
+        param_mas = res_mas
+
+    return res_mas
+
+def parse_list(param_mas):
+    # рекурсивно обрабатывает массив, и разворачивает конструкции вида 1..10
+    nn, res_mas = 0, []
+    while nn<len(param_mas):
+        par=param_mas[nn]
+        if typeof(par)=="list":
+            param_mas[nn] = par = parse_list(par)
+        elif typeof(par) == "str":
+            pos = par.find("..")
+            if pos >= 0:
+                par_str = par
+                str1, str2, str_ = par_str[:pos], par_str[pos + 2:], ""
+                res_mas.append(str1)
+                str_ = int(str1)
+                while str(str_) != str2:
+                    str_ += 1
+                    res_mas.append(str(str_))
+                nn += 1
+                continue
+        res_mas.append(par)
+        nn += 1
+
+    return res_mas
