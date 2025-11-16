@@ -1,0 +1,62 @@
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+canvas.width = 500;
+canvas.height = 500;
+
+const r = 150;
+const d = 100; // расстояние между центрами
+
+const cx1 = canvas.width / 2 - d;
+const cy1 = canvas.height / 2;
+const cx2 = canvas.width / 2 + d;
+const cy2 = canvas.height / 2;
+
+ctx.fillStyle = "#000";
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+// Массив для хранения уже закрашенных точек
+const filled = new Set();
+
+function isInCircle(x, y, cx, cy, r) {
+  const dx = x - cx;
+  const dy = y - cy;
+  return dx * dx + dy * dy <= r * r;
+}
+
+function drawPoint(x, y) {
+  const key = x + "," + y;
+  if (filled.has(key)) return false;
+
+  if (
+    isInCircle(x, y, cx1, cy1, r) &&
+    isInCircle(x, y, cx2, cy2, r)
+  ) {
+    ctx.fillStyle = "white";
+    ctx.fillRect(x, y, 1, 1);
+    filled.add(key);
+    return true;
+  }
+  return false;
+}
+
+function step() {
+  let count = 0;
+  for (let i = 0; i < 1000; i++) {
+    const x = Math.floor(Math.random() * canvas.width);
+    const y = Math.floor(Math.random() * canvas.height);
+    if (drawPoint(x, y)) {
+      count++;
+    }
+  }
+
+  if (count > 0) {
+    requestAnimationFrame(step);
+  } else {
+    console.log("Завершено: все точки пересечения заполнены.");
+  }
+}
+
+step();
+</script>
