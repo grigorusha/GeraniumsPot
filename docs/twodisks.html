@@ -1,0 +1,1898 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>twodisks</title>
+<script type="text/javascript" src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=cuf2RaEGvN4j0BwLWKtxWjnK9BcheC71X3uLbUK1InLA-1ZK745EGf5s-iB6t3kK_LAjsLZQOAEixbZdrqQgf34hhagtTO42S-X1qFfjaF9qgryLQztyCDW3z_I7bH4BiUycoPjMtrJusbPgbVscVSZCLaL9Wcv9jmmIBdagUWmN5GiIv1lz_BCPPVCjQiY7" charset="UTF-8"></script><link rel="stylesheet" crossorigin="anonymous" href="https://gc.kis.v2.scr.kaspersky-labs.com/E3E8934C-235A-4B0E-825A-35A08381A191/abn/main.css?attr=aHR0cHM6Ly93d3cudHdvZGlza3Mub3JnL3BsYXkvP3I9MS4zMTMmbjE9OCZuMj0xMyZ6b29tPTEuNjM3NDcxNDM5NDUxNjM3NCZ4PTAuMDA1NzI3MzcxODY0Nzc2NDQ1Jnk9MC4wMDI4NjM2ODU5MzIzODgyMjI1"/><script>
+"use strict";
+/*
+ *   Display parameters.
+ */
+var width = 800;
+var height = 600;
+var marg = 10;
+var zoom = 1;
+var sc = 0 ;
+var xoff = 0 ;
+var yoff = 0 ;
+var newxoff = 0, newyoff = 0;
+var obeyscale = 1 ; // obey hires
+var scale = 1 ;
+var color_type = true;
+var defaultthink = 60 * 1000;
+var radiusscale = 1 ; // how much do we scale radius parameters by
+/*
+ *   User interface parameters.
+ */
+var curthink = 1000 * 60 ;
+var pttype = 1 ;
+/*
+ *   Internal rendering parameters.
+ */
+var x=0, y=0, x0=0, y0=0 ;
+var canvas, ctx;
+var fullscreen=false;
+var deepest = 0;
+var renderlim = 300;
+var useinfcolor = false;
+var pallete = [];
+const eps = 1e-9;
+const epseps = eps * eps;
+var san, can, sbn, cbn, ox, oy, ord, p, drawit, mindist, incirc, plen ;
+var ii, wi, state=0, useinfcolor = false ;
+var stopped = true;
+var dofull = true;
+var stoptime;
+var setmax;
+var max_zoom = 25;
+var timelim = 13; // max work milliseconds per anim call
+var largeayes, largebyes, smallano, smallbno, wps, ws, wns, wne ;
+var mincirc = 2 ;
+// this should always be smaller than mincirc
+var circeps = 0.5 ;
+var colormul = [154, 230, 214] ; // these should all be less than 239
+/*
+ *   Model parameters.
+ */
+var ar, br, an, bn, sep, ax, ay, bx, by, arar, brbr, sepd2 ;
+/*
+ *   Rendering engine.
+ */
+function toggle_pttype() {
+   pttype = 3 - pttype;
+   if (pttype == 1){
+      updateValue('mi5', "Image boundary");
+   } else if (pttype == 2) {
+      updateValue('mi5', "Image full discs");
+   }
+}
+
+function toggle_scale() {
+   obeyscale = 1 - obeyscale;
+}
+function toggle_rotype() {
+   dofull = !dofull
+}
+function togglefullscreen() {
+   if (fullscreen) {
+      if (document.webkitExitFullScreen) {
+         document.webkitExitFullscreen();
+      } else {
+         document.exitFullscreen();
+      }
+   } else {
+      if (document.body.webkitRequestFullScreen) {
+         document.body.webkitRequestFullscreen();
+      } else {
+         document.body.requestFullscreen();
+      }
+   }
+   fullscreen = !fullscreen;
+}
+function recolor(flip) {
+   for (var i=0; i<3; i++) {
+      colormul[i] = Math.floor(10 + 228 * Math.random());
+   }
+   pallete = [];
+   if (flip){
+      color_type = !color_type
+   }
+   
+   doanim();
+}
+function drawcirc(ctx, x, y, r) {
+   ctx.beginPath();
+   ctx.arc(Math.floor(x), Math.floor(y), r, 0, 2*Math.PI, false);
+   ctx.stroke();
+}
+var rbm, intwidth, intwidth32 ;
+function saybitcount() {
+   var needed = intwidth * height;
+   var bc = 0 ;
+   for (var i=0; i<needed; i++) {
+      var w = rbm[i];
+      if (w == 0) {
+      } else if (w == 0xffffffff) {
+         bc += 32 ;
+      } else {
+         w = (w & 0x55555555) + ((w >> 1) & 0x55555555) ;
+         w = (w & 0x33333333) + ((w >> 2) & 0x33333333) ;
+         w = (w & 0x0f0f0f0f) + ((w >> 4) & 0x0f0f0f0f) ;
+         bc += (w + (w >> 8) + (w >> 16) + (w >> 24)) & 0xff ;
+      }
+   }
+   console.log(bc);
+}
+function shiftRendered(width, height, dx, dy) {
+   if (dx === 0 && dy === 0)
+      return ;
+   var needed = intwidth * height ;
+// saybitcount();
+   var totshift = dx + dy * intwidth32 ;
+   // shift whole map by this
+   if ((totshift & 31) == 0) { // word shift
+      totshift >>= 5 ;
+      if (totshift < 0) { // go forward
+         for (var i=0; i<needed+totshift; i++) {
+            rbm[i] = rbm[i-totshift] ;
+         }
+         for (var i=needed+totshift; i<needed; i++) {
+            rbm[i] = 0 ;
+         }
+      } else { // go backwards
+         for (var i=needed-1; i>=totshift; i--) {
+            rbm[i] = rbm[i-totshift] ;
+         }
+         for (var i=totshift-1; i>=0; i--) {
+            rbm[i] = 0 ;
+         }
+      }
+   } else {
+      var totw = totshift >> 5 ;
+      var sh = totshift & 31 ;
+      var shmask = ~(-1 << sh) ;
+      if (totshift < 0) {
+         for (var i=0; i<needed+totw; i++) {
+            rbm[i] = (rbm[i-totw] << sh) +
+                     ((rbm[i-totw-1] >> (32 - sh)) & shmask) ;
+         }
+         rbm[needed+totw] = (rbm[needed-1] >> (32 - sh)) & shmask ;
+         for (var i=needed+totw+1; i<needed; i++) {
+            rbm[i] = 0 ;
+         }
+      } else {
+         for (var i=needed-1; i>totw; i--) {
+            rbm[i] = (rbm[i-totw] << sh) +
+                     ((rbm[i-totw-1] >> (32 - sh)) & shmask) ;
+         }
+         rbm[totw] = rbm[0] << sh ;
+         for (var i=totw-1; i>=0; i--) {
+            rbm[i] = 0 ;
+         }
+      }
+   }
+   // if we moved right wrt x, clear relevant left columns
+   if (dx > 0) {
+      if (dx >= 32) {
+         for (var y=0; y<height; y++) {
+            for (var i=0; 32*(i+1)<=dx; i++) {
+               rbm[y*intwidth+i] = 0 ;
+            }
+         }
+      }
+      if (dx & 31) { // clear specific columns
+         var x = dx >> 5 ;
+         var mask = (-1 << (dx & 31)) ;
+         for (var y=0; y<height; y++) {
+            rbm[y*intwidth+x] &= mask ;
+         }
+      }
+   // if we moved left wrt x, clear relevant right columns
+   } else if (dx < 0) {
+      dx -= (intwidth32 - width) ;
+      if (dx <= -32) {
+         for (var y=0; y<height; y++) {
+            for (var i=intwidth-1; 32*(i+1)>=intwidth32+dx; i--) {
+               rbm[y*intwidth+i] = 0 ;
+            }
+         }
+      }
+      if (dx & 31) { // clear specific columns
+         var x = (intwidth32 + dx) >> 5 ;
+         var mask = ~(-1 << (dx & 31)) ;
+         for (var y=0; y<height; y++) {
+            rbm[y*intwidth+x] &= mask ;
+         }
+      }
+   }
+   // set all the bits off the bitmap, if necessary.
+   if ((width & 31) != 0) {
+      var rightbits = (-1) << (width & 31) ;
+      for (var i=intwidth-1; i<needed; i += intwidth) {
+         rbm[i] |= rightbits ;
+      }
+   }
+// saybitcount();
+}
+function checkRendered(width, height) {
+   intwidth = (width + 31) >> 5 ;
+   intwidth32 = intwidth * 32 ;
+   var needed = intwidth * height ;
+   if (rbm === undefined || rbm.length < needed) {
+      rbm = new Uint32Array(needed) ;
+   } else {
+      for (var i=0; i<needed; i++) {
+         rbm[i] = 0 ;
+      }
+   }
+   // set all the bits off the bitmap, if necessary.
+   if ((width & 31) != 0) {
+      var rightbits = (-1) << (width & 31) ;
+      for (var i=intwidth-1; i<needed; i += intwidth) {
+         rbm[i] = rightbits ;
+      }
+   }
+}
+var gat = 0;
+var xcent = 0, calch, calcw, firstpts ;
+// typ is undefined or 0 (don't rescale, not a pan), 1 (pan), 2 (rescale)
+// 0 and 2 redraw from scratch (clear); 1 copies what was there.
+// type=3 means, respect the zoom we got
+function doanim(typ) {
+    var oax = ax ;
+    var oay = ay ;
+    getUIParams();
+    if (sc == 0 || typ == 2 || typ == 3) {
+       calch = Math.max(ar, br) * 2;
+       calcw = ar + br + sep;
+       if (typ == 2) { // set zoom to something that works here
+          zoom = 
+              Math.min(((height-2*marg))/calch, ((width-2 * marg))/calcw)/
+              Math.min(((height-2*marg))/4.3, ((width-2 * marg))/6.3);
+          xoff = 0;
+          yoff = 0;
+       } else if (typ != 3) {
+          zoom = 1;
+          xoff = 0;
+          yoff = 0;
+       }
+       xcent = 0.5 * (sep + br - ar) ;
+    }
+    sc = Math.min(((height-2*marg)*zoom)/4.3, ((width-2 * marg)*zoom)/6.3);
+    if (newxoff != 0 || newyoff != 0) {
+       xoff = - newxoff * sc / (scale * zoom);
+       yoff = newyoff * sc / (scale * zoom) ;
+       newxoff = 0;
+       newyoff = 0;
+    }
+    slowsetquerystring();
+    firstpts = 0 ;
+    ay = scale * yoff * zoom + height / 2;
+    ax = scale * xoff * zoom + width / 2 - xcent * sc;
+    ax = Math.floor(ax) + 0.5;
+    ay = Math.floor(ay) + 0.5;
+    arar = ar * ar ;
+    brbr = br * br ;
+    sepd2 = sep * 0.5 ;
+    by = ay;
+    bx = ax + sep * sc;
+    san = Math.sin(Math.PI * 2 / an);
+    can = Math.cos(Math.PI * 2 / an);
+    sbn = -Math.sin(Math.PI * 2 / bn);
+    cbn = Math.cos(Math.PI * 2 / bn);
+    if (typ === 1) {
+       ctx.globalCompositeOperation = "copy";
+       ctx.drawImage(ctx.canvas, ax-oax, ay-oay, width, height);
+       ctx.globalCompositeOperation = "source-over";
+       shiftRendered(width, height, ax-oax, ay-oay) ;
+       //ctx.clearRect(0, 0, canvas.width, canvas.height); // debug
+       //checkRendered(width, height) ;
+       //ctx.setTransform(otrans);
+       //ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else {
+       ctx.clearRect(0, 0, canvas.width, canvas.height);
+       checkRendered(width, height) ;
+    }
+    drawcirc(ctx, ax, ay, ar * sc);
+    drawcirc(ctx, bx, by, br * sc);
+    deepest = 0;
+    renderlim = 300;
+    gat = 0;
+    curthink = defaultthink ;
+    state = 0;
+    setmax = false;
+    stoptime = performance.now() + curthink ; // stop after 60s
+    if (stopped) {
+        stopped = false;
+        requestAnimationFrame(dowork);
+    }
+    return false; // suppress submit
+}
+
+//   Radix sort on pairs of doubles using typed arrays.
+//   Accepts a work array that has to be as large as the
+//   input array; we ping-pong between the two.
+//   This version also sorts an auxilliary array in the same way.
+function coordinateSort(p, st, e, aux) {
+   var n = e - st ;
+   var cnts = new Array(8 * 256) ;
+   cnts.fill(0) ;
+   var bytes = new Uint8Array(p.buffer, st * 8, n * 8) ;
+   var wbytes = new Uint8Array(p.buffer, e * 8, n * 8) ;
+   for (var i=0; i<bytes.length; i += 16) {
+      for (var j=0; j<8; j++) {
+         cnts[j*256+bytes[i+j]] += 2 ;
+      }
+   }
+   for (var i=0; i<8; i++) {
+      var xor = 0 ;
+      if (i == 7) {
+         xor = 128 ;
+      }
+      var s = 0 ;
+      for (var j=0; j<256; j++) {
+         var ind = i*256 + (j ^ xor) ;
+         var s2 = s + cnts[ind] ;
+         cnts[ind] = s ;
+         s = s2 ;
+      }
+   }
+   var s2 = e ;
+   var e2 = s2 + n ;
+   var negcnt = cnts[7*256] - 2 ;
+   for (var i = 0; i < 8; i++) {
+      for (var j = 0; j < n; j += 2) {
+         var off = i*256 + bytes[i+j*8] ;
+         var dest = cnts[off] ;
+         cnts[off] = dest + 2 ;
+         p[s2 + dest] = p[st + j] ;
+         p[s2 + dest + 1] = p[st + j + 1] ;
+         aux[(s2 + dest) >> 1] = aux[(st + j) >> 1] ;
+      }
+      var t = e ;
+      e = e2 ;
+      e2 = t ;
+      t = st ;
+      st = s2 ;
+      s2 = t ;
+      var t3 = bytes ;
+      bytes = wbytes ;
+      wbytes = t3 ;
+   }
+   for (var i = 0; i + i < negcnt; i += 2) {
+      var t2 = p[st + i];
+      p[st + i] = p[st + negcnt - i] ;
+      p[st + negcnt - i] = t2 ;
+      t2 = p[st + i + 1];
+      p[st + i + 1] = p[st + negcnt - i + 1] ;
+      p[st + negcnt - i + 1] = t2 ;
+      var t4 = aux[(st + i) >> 1] ;
+      aux[(st + i) >> 1] = aux[(st + negcnt - i) >> 1] ;
+      aux[(st + negcnt - i) >> 1] = t4 ;
+   }
+}
+function dd(pp, i, j) {
+   var dy = pp[i] - pp[j] ;
+   var dx = pp[i + 1] - pp[j + 1] ;
+   return dx * dx + dy * dy ;
+}
+function drawrbmcirc(x, y, r) {
+   var rr = Math.floor(Math.max(0, r-0.2)); // be conservative
+   for (var yy=Math.max(0, y-rr); yy<Math.min(height, y+rr+1); yy++) {
+      var xd = Math.floor(Math.sqrt(rr*rr-(yy-y)*(yy-y)));
+      var xx = Math.max(0, x-xd);
+      var hix = Math.min(width, x+xd+1);
+      while (xx < hix) {
+         var off = yy * intwidth32 + xx ;
+         if (hix - xx >= 32 && (xx & 31) === 0) {
+            rbm[off>>5] = 0xffffffff ;
+            xx += 32;
+         } else {
+            rbm[off>>5] |= 1<<(off&31);
+            xx++;
+         }
+      }
+   }
+// if (y >= 0 && y < height && x >= 0 && x < width) {
+//    var off = y * intwidth32 + x ;
+//    rbm[off>>5] |= 1<<(off&31);
+// }
+   ctx.beginPath();
+   ctx.arc(x+0.5, y+0.5, r, 0, 2*Math.PI, false);
+   ctx.fill();
+// ctx.beginPath();
+// ctx.arc(x+0.5, y+0.5, r, 0, 2*Math.PI, false);
+// ctx.stroke();
+}
+function keeprendering() {
+   stoptime = performance.now() + curthink;
+   if (stopped) {
+      stopped = false;
+      requestAnimationFrame(dowork);
+   }
+}
+//
+//  Frontier-based BFS.
+//
+const MAXCOORDS = 4800000 ;
+const jumblelev = 100000 ;
+var p = new Float64Array(MAXCOORDS*2) ;
+var hint = new Uint8Array(MAXCOORDS) ;
+// state 0: pick a new point and initialize
+// state 1: chase through points, and accumulate
+// state 2: render
+function define_color(){
+   if (color_type){
+      var cr = ord * colormul[0] % 251;
+      var cg = ord * colormul[1] % 241;
+      var cb = ord * colormul[2] % 239;
+   }
+   else{
+      var color1 = document.getElementById("color1").value;
+      var color2 = document.getElementById("color2").value;
+      var color3 = document.getElementById("color3").value;
+
+      var position = ord * colormul[0] % 100;
+
+      if (position <= 50) {
+         cr = Math.round(parseInt(color1.substring(1, 3), 16) * (1 - position / 50) + parseInt(color2.substring(1, 3), 16) * (position / 50));
+         cg = Math.round(parseInt(color1.substring(3, 5), 16) * (1 - position / 50) + parseInt(color2.substring(3, 5), 16) * (position / 50));
+         cb = Math.round(parseInt(color1.substring(5, 7), 16) * (1 - position / 50) + parseInt(color2.substring(5, 7), 16) * (position / 50));
+      } else {
+         position -= 50;
+         cr = Math.round(parseInt(color2.substring(1, 3), 16) * (1 - position / 50) + parseInt(color3.substring(1, 3), 16) * (position / 50));
+         cg = Math.round(parseInt(color2.substring(3, 5), 16) * (1 - position / 50) + parseInt(color3.substring(3, 5), 16) * (position / 50));
+         cb = Math.round(parseInt(color2.substring(5, 7), 16) * (1 - position / 50) + parseInt(color3.substring(5, 7), 16) * (position / 50));
+      }
+
+
+   }
+   pallete[ord] = "rgb(" + cr + "," + cg + "," + cb + ")";
+}
+// find a pixel on the screen that's not rendered yet
+function findunsetbit() {
+   while (true) {
+      var off = gat;
+      gat = (gat + 10007) % (intwidth32 * height);
+      if (gat == 0) {
+         stopped = true;
+         console.log("Done");
+         return false;
+      }
+      if (0 == (rbm[off >> 5] & (1 << (off & 31)))) {
+         rbm[off >> 5] |= (1<<(off & 31));
+         y0 = Math.floor(off / intwidth32);
+         x0 = off % intwidth32;
+         return true;
+      }
+   }
+}
+function doworkfull() {
+    var start = performance.now();
+    if (start > stoptime || stopped) {
+        stopped = true;
+    } else {
+        requestAnimationFrame(dowork);
+    }
+    while (1) {
+        if (state == 0) {
+            for (var lop=1; ; lop++) {
+                if ((lop & 8191) == 0 && performance.now() - start > timelim) {
+                    return;
+                }
+                if (pttype == 1) {
+                   if (!findunsetbit()) {
+                      return ;
+                   }
+                   if (firstpts > 1) {
+                      x = (x0 - ax) / sc ;
+                      y = (y0 - ay) / sc ;
+                   } else {
+                      x = 1e-6 + 2 * firstpts ;
+                      y = 0 ;
+                      firstpts++ ;
+                   }
+                   var off = y0 * intwidth32 + x0;
+                   if (Math.hypot(x, y) >= ar && Math.hypot(x-sep, y) >= br) {
+                      continue ;
+                   }
+                } else if (pttype == 2) {
+                   x = Math.random() * 2 * 3.14159265358979 ;
+                   if (Math.random() < 0.5) {
+                      y = (ar - 2 * eps) * Math.sin(x) ;
+                      x = (ar - 2 * eps) * Math.cos(x) ;
+                   } else {
+                      y = (br - 2 * eps) * Math.sin(x) ;
+                      x = sep + (br - 2 * eps) * Math.cos(x) ;
+                   }
+                }
+                break ;
+            }
+            x -= sep / 2 ;
+            ord = 0;
+            drawit = false;
+            incirc = false;
+            state = 1;
+            ii = 0;
+            p[0] = y ;
+            p[1] = x ;
+            hint[0] = 0 ;
+            wps = 0 ;
+            ws = 0 ;
+            wns = 2 ;
+            wne = wns ;
+            largeayes = 0 ;
+            largebyes = 0 ;
+            smallano = 1e10 ;
+            smallbno = 1e10 ;
+        }
+        if (state == 1) {
+            var sqrt = Math.sqrt;
+            for (ii=1; ; ii++) {
+               if (wns == ws) {
+                  drawit = true;
+                  break ;
+               }
+               if (performance.now() - start > timelim) {
+                  return;
+               }
+               if (wns > 2 * renderlim) {
+                  break ;
+               }
+               for (var i=ws; i<wns; i += 2) {
+                  y = p[i] ;
+                  x = p[i + 1] ;
+                  var h = hint[i>>1] ;
+                  var xm = x - sepd2 ;
+                  var xp = x + sepd2 ;
+                  var pp = xp * xp + y * y ;
+                  if (wne + 16 > MAXCOORDS) {
+  // if a particular level gets this large, we also blow past renderlim
+                     break;
+                  }
+                  if (pp < arar) {
+                     incirc = true ;
+                     if (h !== 2) {
+                        var nx = xp * can + y * san;
+                        var ny = y * can - xp * san;
+                        hint[wne>>1] = 1 ;
+                        p[wne++] = ny ;
+                        p[wne++] = nx - sepd2 ;
+                     }
+                     if (h !== 1) {
+                        var nx = xp * can - y * san;
+                        var ny = y * can + xp * san;
+                        hint[wne>>1] = 2 ;
+                        p[wne++] = ny ;
+                        p[wne++] = nx - sepd2 ;
+                     }
+                     largeayes = Math.max(largeayes, pp) ;
+                  } else {
+                     smallano = Math.min(smallano, pp) ;
+                  }
+                  pp = xm * xm + y * y ;
+                  if (pp < brbr) {
+                     incirc = true ;
+                     if (h !== 4) {
+                        var nx = xm * cbn + y * sbn;
+                        var ny = y * cbn - xm * sbn;
+                        hint[wne>>1] = 3 ;
+                        p[wne++] = ny ;
+                        p[wne++] = nx + sepd2 ;
+                     }
+                     if (h !== 3) {
+                        var nx = xm * cbn - y * sbn;
+                        var ny = y * cbn + xm * sbn;
+                        hint[wne>>1] = 4 ;
+                        p[wne++] = ny ;
+                        p[wne++] = nx + sepd2 ;
+                     }
+                     largebyes = Math.max(largebyes, pp) ;
+                  } else {
+                     smallbno = Math.min(smallbno, pp) ;
+                  }
+               }
+               coordinateSort(p, wns, wne, hint) ;
+               var wpi = wps ;
+               var wci = ws ;
+               wi = wns ;
+               for (var i=wns; i<wne; i += 2) {
+                  var skipit = 0 ;
+                  for (var j=i+2; skipit === 0 && j<wne && p[i] + eps > p[j]; j += 2) {
+                     if (dd(p, i, j) < epseps) {
+                        skipit = 1 ;
+                     }
+                  }
+                  while (wpi < ws && p[i] > p[wpi] + eps) {
+                     wpi += 2 ;
+                  }
+                  for (var j=wpi; skipit === 0 && j<ws && p[i] + eps > p[j]; j += 2) {
+                     if (dd(p, i, j) < epseps) {
+                        skipit = 1 ;
+                     }
+                  }
+                  while (wci < wns && p[i] > p[wci] + eps) {
+                     wci += 2 ;
+                  }
+                  for (var j=wci; skipit === 0 && j<wns && p[i] + eps > p[j]; j += 2) {
+                     if (dd(p, i, j) < epseps) {
+                        skipit = 1 ;
+                     }
+                  }
+                  if (skipit === 0) {
+                     hint[wi>>1] = hint[i>>1] ;
+                     p[wi++] = p[i] ;
+                     p[wi++] = p[i + 1] ;
+                  }
+               }
+               wps = ws ;
+               ws = wns ;
+               wns = wi ;
+               wne = wi ;
+               ord = wi / 2 ;
+            }
+            if (!drawit) {
+               if (renderlim < jumblelev) {
+                   deepest = renderlim-1; 
+                   noticeOrder(">" + deepest);
+                   renderlim = Math.floor(renderlim * 1.2);
+                   if (renderlim > jumblelev) {
+                      renderlim = jumblelev ;
+                   }
+               } else { 
+                  if (! setmax) {
+                     deepest = renderlim-1;
+                     noticeOrder(">" + deepest);
+                     setmax = true;
+                  } 
+                  useinfcolor = true;
+                  drawit = true;
+               }
+            } else {
+               useinfcolor = false;
+            }
+            if (!incirc || !drawit) {
+                state = 0;
+            } else {
+                state = 2;
+                ii = 0;
+            }
+        }
+        if (state == 2) {
+            mindist = sc * Math.min(
+                 Math.min(ar-Math.sqrt(largeayes), Math.sqrt(smallano) - ar),
+                 Math.min(br-Math.sqrt(largebyes), Math.sqrt(smallbno) - br)) ;
+            if (!useinfcolor && ord > deepest) {
+                deepest = ord;
+                noticeOrder("" + deepest);
+            }
+            if (!pallete[ord]) {
+               define_color();  
+            }
+            if (useinfcolor) {
+               mindist = 1e-9;
+               ctx.fillStyle = "rgb(128,128,128)";
+            } else {
+               ctx.fillStyle = pallete[ord];
+            }
+            var abx = 0.5 * (ax + bx);
+            if (mindist < mincirc) {
+                for (; ii<wi; ii += 2) {
+                    if ((ii & 8191) == 0 && performance.now() - start > timelim) {
+                        return;
+                    }
+                    y = (p[ii] * sc + ay + 0.5) | 0 ;
+                    x = (p[ii+1] * sc + abx + 0.5) | 0 ;
+                    if (y >= 0 && y < height && x >= 0 && x < width) {
+                       var off = y * intwidth32 + x ;
+                       rbm[off>>5] |= 1<<(off&31);
+                       ctx.fillRect(x, y, 1, 1);
+                    }
+                }
+            } else {
+                for (; ii<wi; ii += 2) {
+                    if ((ii & 8191) == 0 && performance.now() - start > timelim) {
+                        return;
+                    }
+                    y = (p[ii] * sc + ay + 0.5) | 0 ;
+                    x = (p[ii+1] * sc + abx + 0.5) | 0 ;
+                    drawrbmcirc(x, y, mindist-circeps) ;
+                }
+            }
+            state = 0;
+        }
+    }
+}
+function doworkgen() {
+    var start = performance.now();
+    if (start > stoptime || stopped) {
+        stopped = true;
+    } else {
+        requestAnimationFrame(dowork);
+    }
+    while (1) {
+        if (state == 0) {
+            for (var lop=1; ; lop++) {
+                if ((lop & 8191) == 0 && performance.now() - start > timelim) {
+                    return;
+                }
+                if (pttype == 1) {
+                   if (!findunsetbit()) {
+                      return ;
+                   }
+                   if (firstpts > 1) {
+                      x = (x0 - ax) / sc ;
+                      y = (y0 - ay) / sc ;
+                   } else {
+                      x = 1e-6 + 2 * firstpts ;
+                      y = 0 ;
+                      firstpts++ ;
+                   }
+                   var off = y0 * intwidth32 + x0;
+                   if (Math.hypot(x, y) >= ar && Math.hypot(x-sep, y) >= br) {
+                      continue ;
+                   }
+                } else if (pttype == 2) {
+                   x = Math.random() * 2 * 3.14159265358979 ;
+                   if (Math.random() < 0.5) {
+                      y = (ar - 2 * eps) * Math.sin(x) ;
+                      x = (ar - 2 * eps) * Math.cos(x) ;
+                   } else {
+                      y = (br - 2 * eps) * Math.sin(x) ;
+                      x = sep + (br - 2 * eps) * Math.cos(x) ;
+                   }
+                } else {
+                   x = sep / 2 ;
+                   y = 0 ;
+                }
+                break ;
+            }
+            ox = x;
+            oy = y;
+            ord = 0;
+            plen = 0;
+            drawit = false;
+            mindist = 1000;
+            incirc = false;
+            state = 1;
+            ii = 0;
+        }
+        if (state == 1) {
+            var sqrt = Math.sqrt;
+            for (; ii<renderlim; ii++) {
+                if ((ii & 8191) == 0 && performance.now() - start > timelim) {
+                    return;
+                }
+                var t = sqrt(x * x + y * y) - ar;
+                if (t <= 0) {
+                    t = - t;
+                    incirc = true;
+                    var nx = x * can + y * san;
+                    y = y * can - x * san;
+                    x = nx;
+                }
+                if (t < mindist) {
+                    mindist = t;
+                }
+                x -= sep;
+                var t = sqrt(x * x + y * y) - br;
+                if (t <= 0) {
+                    t = - t;
+                    incirc = true;
+                    var nx = x * cbn + y * sbn;
+                    y = y * cbn - x * sbn;
+                    x = nx;
+                }
+                if (t < mindist) {
+                    mindist = t;
+                }
+                var xx = (x + sep) * sc + ax;
+                if (xx + mindist >= 0 && xx - mindist <= width) {
+                    var yy = y * sc + ay;
+                    if (yy + mindist >= 0 && yy - mindist <= height) {
+                        p[plen++] = (x + sep) * sc + ax;
+                        p[plen++] = y * sc + ay;
+                    }
+                }
+                ord++;
+                var dx = x + sep - ox;
+                if (dx * dx < epseps) {
+                    var dy = y - oy;
+                    if (dx * dx + dy * dy < epseps) {
+                        drawit = true;
+                        break;
+                    }
+                }
+                x += sep;
+            }
+            mindist *= sc;
+            if (!drawit) {
+               if (renderlim < jumblelev) {
+                   deepest = renderlim;
+                   noticeOrder(">" + deepest);
+                   renderlim = Math.floor(renderlim * 1.2);
+                   if (renderlim > jumblelev) {
+                      renderlim = jumblelev ;
+                   }
+               } else {
+                  if (! setmax) {
+                     deepest = renderlim;
+                     noticeOrder(">" + deepest);
+                     setmax = true;
+                  }
+                  useinfcolor = true;
+                  drawit = true;
+               }
+            } else {
+               useinfcolor = false;
+            }
+            if (!incirc || !drawit) {
+                state = 0;
+            } else {
+                state = 2;
+                ii = 0;
+            }
+        }
+        if (state == 2) {
+            if (!useinfcolor && ord > deepest) {
+                deepest = ord;
+                noticeOrder("" + deepest);
+            }
+            if (!pallete[ord]) {
+               define_color(); 
+            }
+            if (useinfcolor) {
+               mindist = 1e-9;
+               ctx.fillStyle = "rgb(128,128,128)";
+            } else {
+               ctx.fillStyle = pallete[ord];
+            }
+            if (mindist < mincirc) {
+                for (; ii<plen; ii += 2) {
+                    if ((ii & 8191) == 0 && performance.now() - start > timelim) {
+                        return;
+                    }
+                    y = (p[ii+1] + 0.5) | 0 ;
+                    x = (p[ii] + 0.5) | 0 ;
+                    if (y >= 0 && y < height && x >= 0 && x < width) {
+                       var off = y * intwidth32 + x ;
+                       rbm[off>>5] |= 1<<(off&31);
+                       ctx.fillRect(x, y, 1, 1);
+                    }
+                }
+            } else {
+                for (; ii<plen; ii += 2) {
+                    if ((ii & 8191) == 0 && performance.now() - start > timelim) {
+                        return;
+                    }
+                    y = (p[ii+1] + 0.5) | 0 ;
+                    x = (p[ii] + 0.5) | 0 ;
+                    drawrbmcirc(x, y, mindist-circeps);
+                }
+            }
+            state = 0;
+        }
+    }
+}
+function dowork() {
+   if (dofull) {
+      doworkfull() ;
+   } else {
+      doworkgen() ;
+   }
+}
+function getvalue(s) {
+    var r;
+    r = +document.getElementById(s).value;
+//  document.getElementById("show"+s).innerText = r;
+    return r;
+}
+function setquerystring() {
+    var qs = [];
+    if (ar == br) {
+       qs.push("r=" + ar/radiusscale);
+    } else {
+       qs.push("r1=" + ar/radiusscale);
+       qs.push("r2=" + br/radiusscale);
+    }
+    if (an==bn) {
+       qs.push("n=" + an);
+    } else {
+       qs.push("n1=" + an);
+       qs.push("n2=" + bn);
+    }
+    if (!dofull) {
+       qs.push("gen=ab");
+    }
+    if (pttype == 2) {
+       qs.push("point=boundary");
+    }
+    if (zoom != 1) {
+       qs.push("zoom=" + zoom);
+    }
+    if (xoff != 0) {
+       qs.push("x=" + (-xoff*scale*zoom/sc));
+    }
+    if (yoff != 0) {
+       qs.push("y=" + yoff*scale*zoom/sc);
+    }
+    const url = new URL(window.location.href);
+    url.search = qs.join("&");
+    window.history.replaceState("", "", url);
+}
+// this function definition looks weird, but it's the way it is
+// so we create a closure that stores the "timer".
+var slowsetquerystring = (() => {
+   let timer;
+   clearTimeout(timer);
+   timer = setTimeout(setquerystring, 500);
+}) ;
+function getUIParams() {
+    width = canvas.clientWidth;
+    height = canvas.clientHeight;
+    scale = window.devicePixelRatio;
+    if (obeyscale) {
+       width *= scale;
+       height *= scale;
+    } else {
+       scale = 1;
+    }
+    if (canvas.width != width || canvas.height != height) {
+       canvas.width = width;
+       canvas.height = height;
+    }
+    ar = getvalue("range1") / radiusscale;
+    br = getvalue("range3") / radiusscale;
+    an = getvalue("range2");
+    bn = getvalue("range4");
+    sep = 2;
+    console.log("ar",ar,"br",br,"an",an,"bn",bn,"sep",sep,"zoom",zoom,"scale",scale,"width",width,"height",height);
+    updateGroupLabel();
+}
+function noticeOrder(s) {
+    // document.getElementById("order").innerText = s;
+}
+      var timer;
+      function activate_ui() {
+         var bc1 = document.getElementById("button_container1");
+         var lc1 = document.getElementById("labelcontainer1");
+         var lc2 = document.getElementById("labelcontainer2");
+         var keb = document.getElementById("kebab");
+         var menu = document.getElementById("menu");
+
+         bc1.style.opacity = "1";
+         lc1.style.opacity = "1";
+         lc2.style.opacity = "1";
+         keb.style.opacity = "1";
+
+         bc1.style.display = "flex";
+         lc1.style.display = "flex";
+         lc2.style.display = "flex";
+         keb.style.display = "flex";
+         // menu.style.display = "flex";
+
+         if (timer) {
+         clearTimeout(timer);
+         }
+         if (isInteracting == false){
+
+            timer = setTimeout(function () {
+               bc1.style.opacity = "0";
+               lc1.style.opacity = "0";
+               lc2.style.opacity = "0";
+               keb.style.opacity = "0";
+               menu.style.opacity = "0";
+
+               timer = setTimeout(function () {
+               bc1.style.display = "none";
+               lc1.style.display = "none";
+               lc2.style.display = "none";
+               keb.style.display = "none";
+               menu.style.display = "none";
+            }, 300);
+
+            }, 3500);
+
+            
+         }
+      }
+      
+
+
+      var label_timer;
+      function updateGroupLabel() {
+         var fmtr = new Intl.NumberFormat('en-US', {minimumFractionDigits: 3});
+         var box = document.getElementById("labelcontainer1");
+         var art = fmtr.format(Math.floor(ar*1000)/1000);
+         var brt = fmtr.format(Math.floor(br*1000)/1000);
+         var gg_sub = " ";
+         var rad = " ";
+
+         if (an == bn){
+            gg_sub = "<sub>" + an + "</sub>";}
+         else {
+            gg_sub = "<sub>" + an + ', ' + bn + "</sub>";}
+         gg_sub = gg_sub.fontsize(3.5);
+
+         if (ar == br){
+            rad = '(' + art + ')';}
+         else {
+            rad = '(' + art + ', ' + brt + ')';}
+
+         var text = '<i>GG</i>' + gg_sub + rad;
+         updateValue("labelcontainer1", text);
+      }
+
+      var hamburger_timer;
+      function activate_hamburger_menu() {
+        var menu = document.getElementById("menu");
+        menu.style.opacity = "1";
+        menu.style.display = "block";
+
+         if (timer) {
+         clearTimeout(timer);
+         }
+         if (isInteracting == false){
+
+            timer = setTimeout(function () {
+               menu.style.opacity = "0";
+            }, 3500);
+         }
+      }
+
+      function show_slider(id) {
+         var slider = document.getElementById(id);
+         slider.style.display = "block";
+      }
+
+      function close_slider(id) {
+        var slider = document.getElementById(id);
+        slider.style.display = "none";
+      }
+
+      function update_button_color(buttonin, c_in){
+         var butt = document.getElementById(buttonin);
+         if (c_in){
+            butt.style.color = "black";
+            butt.style.backgroundColor = "#e3e3e3";
+         }
+         else{
+            butt.style.color = "white";
+            butt.style.backgroundColor = "#333";
+         }
+      }
+
+      function onlySlider(n) {
+        for (var i = 1; i <= 6; i++) {
+          if (i == n) {
+            show_slider("slide_box" + i);
+            update_button_color("button" + i, true);
+          } else {
+            close_slider("slide_box" + i);
+            update_button_color("button" + i, false);
+          }
+        }
+      }
+
+      function updateValue(label, val) {
+        document.getElementById(label).innerHTML = val;
+      //   doanim();
+      }
+
+      function downloadimage() {
+         var image = canvas.toDataURL("image/png")
+                      .replace("image/png", "image/octet-stream");
+         var hiddenlink = document.getElementById("downloadlink");
+         hiddenlink.href = image;
+         hiddenlink.download = "dx.png";
+         hiddenlink.click();
+      }
+
+      function criticalsnap() {
+         var lim = cr[Math.max(an, bn)][Math.min(an, bn)] ;
+         if (lim !== undefined) {
+            document.getElementById("range1").value = radiusscale * lim;
+            document.getElementById("range6").value = radiusscale * lim;
+            document.getElementById("range3").value = radiusscale * lim;
+            doanim(2);
+         }
+      }
+      function getrr() {
+         // these values are from the range sliders
+         if (dofull){
+            return 1 + (1.25 * Math.random()) + (1.25 * Math.random());
+         }
+         else {
+            return 0.75 + (2.75 * Math.random());
+         }
+      }
+      function setUI(name, value) {
+         document.getElementById(name).value = value;
+      }
+      function dorandom() {
+         var n1 = 2 + Math.floor(18 * Math.random());
+         var n2 = 2 + Math.floor(18 * Math.random());
+         setUI('range2', n1);
+         setUI('range4', n2);
+         var lim = cr[Math.max(n1, n2)][Math.min(n1, n2)] ;
+         if (lim === undefined) {
+            lim = 1000000 ;
+         }
+         // let us go a little into the critical region sometimes
+         lim = (lim - 1) * 1.1 + 1 ;
+         while (1) {
+            var r1 = getrr() ;
+            var r2 = getrr() ;
+            ar = r1 / radiusscale ;
+            br = r2 / radiusscale ;
+            if (dofull) {
+               if (ar + br > 2 && 4 * Math.max(ar, br) + Math.min(ar, br) < 5 * lim) {
+                  setUI('range1', r1);
+                  setUI('range3', r2);
+                  setUI('range5', 0.5*(r1+r2));
+                  break ;
+               }
+            } else {
+               setUI('range1', r1);
+               setUI('range3', r2);
+               setUI('range5', 0.5*(r1+r2));
+               break ;
+
+            }
+         }
+         doanim(2);
+         set_r_slider();
+      }
+
+      function start() {
+         canvas = document.getElementById("canvas");
+         ctx = canvas.getContext("2d");
+
+         addEvent(window, "keydown", keypress);
+         addEvent(window, "keypress", keypress);
+         var sawqueryparam = false ;
+         var queryparams = new URLSearchParams(window.location.search);
+         var gotzoom = false;
+         newxoff = 0;
+         newyoff = 0;
+         for (const [key, value] of queryparams) {
+            if (!sawqueryparam) {
+               setUI('range1', 1*radiusscale);
+               setUI('range3', 1*radiusscale);
+               setUI('range5', 1*radiusscale);
+               setUI('range2', 2);
+               setUI('range4', 2);
+               setUI('range6', 2);
+            }
+            sawqueryparam = true;
+            switch (key) {
+case 'r':
+               setUI('range1', value*radiusscale);
+               setUI('range3', value*radiusscale);
+               setUI('range5', value*radiusscale);
+               break;
+case 'r1':
+               setUI('range1', value*radiusscale);
+               break;
+case 'r2':
+               setUI('range3', value*radiusscale);
+               break;
+case 'n':
+               setUI('range2', value);
+               setUI('range4', value);
+               setUI('range6', value);
+               break;
+case 'n1':
+               setUI('range2', value);
+               break;
+case 'n2':
+               setUI('range4', value);
+               break;
+case 'gen':
+               if (dofull) {
+                  dofull = false;
+                  update_rot_label();
+               }
+               break;
+case 'point':
+               if (pttype != 2) {
+                  toggle_pttype();
+               }
+               break;
+case 'zoom':
+               zoom = value;
+               gotzoom = 1;
+               break;
+case 'x':
+               newxoff = value;
+               gotzoom = 1;
+               break;
+case 'y':
+               newyoff = value;
+               gotzoom = 1;
+               break;
+            }
+         }
+         if (!sawqueryparam) {
+            dorandom();
+         } else {
+            set_r_slider();
+            if (gotzoom) {
+               doanim(3);
+            } else {
+               doanim(2);
+            }
+         }
+         onlySlider(1);
+         toggle_user_guide();
+         // activate_ui();
+      }
+
+      function addEvent(element, eventName, callback) {
+         if (element.addEventListener) {
+            element.addEventListener(eventName, callback, false);
+         } else if (element.attachEvent) {
+            element.attachEvent("on" + eventName, callback);
+         } else {
+            element["on" + eventName] = callback;
+      }
+      }
+
+      function keypress(e) {
+         e = e || window.event;
+         if (e.metaKey) {
+            return;
+         }
+         if (e.keyCode === "]".codePointAt(0)) {
+            if (zoom < max_zoom) {
+               zoom = zoom * 1.25 ;
+               if (zoom > max_zoom) {
+                  zoom = max_zoom ;
+               }
+               doanim() ;
+            }
+         } else if (e.keyCode === "[".codePointAt(0)) {
+            if (zoom > 0.5) {
+               zoom = zoom / 1.25 ;
+               if (zoom < 0.5) {
+                  zoom = 0.5 ;
+               }
+               doanim() ;
+            }
+         } else if (e.keyCode === "0".codePointAt(0)) {
+            zoom = 1 ;
+            xoff = 0 ;
+            yoff = 0 ;
+            doanim() ;
+         } else if (e.keyCode === 39) {
+            xoff += -10;
+            doanim(1) ;
+         } else if (e.keyCode === 40) {
+            yoff += -10;
+            doanim(1) ;
+         } else if (e.keyCode === 37) {
+            xoff += 10;
+            doanim(1) ;
+         } else if (e.keyCode === 38) {
+            yoff += 10;
+            doanim(1) ;
+         } else if (e.keyCode === ".".codePointAt(0)) {
+            pttype = (pttype % 2) + 1 ;
+            doanim() ;
+         } else if (e.keyCode === "c".codePointAt(0)) {
+            curthink = 15 * defaultthink ;
+            stoptime = performance.now() + curthink;
+            stopped = false;
+            dowork();
+         } else if (e.keyCode === "C".codePointAt(0)) {
+            curthink = 7200 * 60 * 1000;
+            defaultthink = curthink ;
+            stoptime = performance.now() + curthink;
+            stopped = false;
+            dowork();
+         } else if (e.keyCode === "r".codePointAt(0)) {
+            dorandom() ;
+         } else if (e.keyCode === "!".codePointAt(0) ||
+                    e.keyCode === "1".codePointAt(0)) {
+            criticalsnap() ;
+         }
+      };
+
+      /* Multiple styles needed to support all browsers*/
+      window.onorientationchange = () => {doanim(0);};
+      window.onresize = () => {doanim(0);}
+
+      window.addEventListener("resize", function(){doanim(0);});
+      window.addEventListener("orientationchange", function(){doanim(0);});
+
+      function get_touch_dist(touch1, touch2){
+         var dx = touch1.clientX - touch2.clientX;
+         var dy = touch1.clientY - touch2.clientY;
+         return Math.sqrt(dx*dx + dy*dy);
+      }
+
+      /* touch controls for mobile*/
+
+      function check_touch_target(target_in){
+         if (target_in == document.getElementById('range1')){return false;}
+         if (target_in == document.getElementById('range2')){return false;}
+         if (target_in == document.getElementById('range3')){return false;}
+         if (target_in == document.getElementById('range4')){return false;}
+         if (target_in == document.getElementById('range5')){return false;}
+         if (target_in == document.getElementById('range6')){return false;}
+
+         if (target_in == document.getElementById('kebab')){return false;}
+
+         if (target_in == document.getElementById('button1')){return false;}
+         if (target_in == document.getElementById('button2')){return false;}
+         if (target_in == document.getElementById('button3')){return false;}
+         if (target_in == document.getElementById('button4')){return false;}
+         if (target_in == document.getElementById('button5')){return false;}
+         if (target_in == document.getElementById('button6')){return false;}
+         if (target_in == document.getElementById('button7')){return false;}
+
+         if (target_in == document.getElementById('menu')){return false;}
+
+         if (target_in == document.getElementById('mi1')){return false;}
+         if (target_in == document.getElementById('mi2')){return false;}
+         if (target_in == document.getElementById('mi3')){return false;}
+         if (target_in == document.getElementById('mi4')){return false;}
+         if (target_in == document.getElementById('mi5')){return false;}
+         if (target_in == document.getElementById('mi6')){return false;}
+
+
+         if (target_in == document.getElementById('button_container1')){return false;}
+
+         return true;
+      }
+      
+      var isDragging = false;
+      var ispinching = false;
+      var isInteracting = false;
+      var touchStartX, touchStartY, initialx, initialy, initialdist, initialzoom;
+
+      document.addEventListener('touchstart', function(e) {
+         keeprendering();
+         isInteracting =true;
+         if (e.touches.length == 1){
+            if (check_touch_target(e.target)){
+               e.preventDefault();
+               isDragging = true;
+               touchStartX = e.touches[0].clientX;
+               touchStartY = e.touches[0].clientY;
+               initialx = xoff;
+               initialy = yoff;
+            }
+         }
+         if (e.touches.length == 2){
+            initialzoom = zoom;
+            initialdist = get_touch_dist(e.touches[0], e.touches[1]);
+            ispinching = true;
+         }
+         activate_ui();
+      });
+
+      document.addEventListener('touchend', function(e) {
+        isDragging = false;
+        ispinching = false;
+        isInteracting = false;
+        activate_ui();
+      });
+
+      document.addEventListener('touchmove', function(e) {
+        if (isDragging === true) {
+          e.preventDefault();
+          var touchX = e.touches[0].clientX - touchStartX;
+          var touchY = e.touches[0].clientY - touchStartY;
+
+          xoff = (touchX/zoom + initialx);
+          yoff = (touchY/zoom + initialy);
+          doanim(ispinching ? 0 : 1);
+        }
+
+         if (ispinching === true) {
+            e.preventDefault();
+            var newdist = get_touch_dist(e.touches[0], e.touches[1]);
+            var scale = newdist/initialdist;
+            zoom = initialzoom*scale;
+
+
+            if (zoom > max_zoom) {zoom = max_zoom;}
+            if (zoom < 0.5) { zoom = 0.5 ;}
+            doanim();
+         }
+        activate_ui();
+      });
+
+      /* pan control for desktop*/
+      document.addEventListener('mousedown', function(e) {
+         isInteracting = true;
+         if (check_touch_target(e.target)){
+            e.preventDefault();
+            isDragging = true;
+            touchStartX = e.clientX;
+            touchStartY = e.clientY;
+            initialx = xoff;
+            initialy = yoff;
+         }
+         activate_ui();
+      });
+
+      document.addEventListener('mouseup', function(e) {
+        keeprendering();
+        isDragging = false;
+        ispinching = false;
+        isInteracting = false;
+        activate_ui();
+      });
+
+      document.addEventListener('mousemove', function(e) {
+        if (isDragging === true) {
+          e.preventDefault();
+          var touchX = e.clientX - touchStartX;
+          var touchY = e.clientY - touchStartY;
+
+          xoff = (touchX/zoom + initialx);
+          yoff = (touchY/zoom + initialy);
+          doanim(1);
+        }
+        activate_ui();
+      });
+      window.onload = start;
+// critical radius data
+var cr = [[], [], [], [],
+   [,,,3.4640934572],
+   [,,4.2979145550,2.4114701046,2.0906599246,2.1489558561],
+   [,,,,1.9999985579,1.8316984635],
+   [,,3.2471482670,1.9676444013,1.8454888403,1.7409736639,1.6582671780,
+    1.6235740447],
+   [,,3.4228059507,1.9930933664,2.4202914488,1.6667405083,1.5980405486,
+    1.5398974328,1.7114054144],
+   [,,2.8169637349,1.9425030829,1.6967122888,1.6084147831,1.5512093381,
+    1.4839500277,1.4404650815,1.4084818900],
+   [,,3.0867048074,1.8808137943,1.6286594127,1.8143239064,1.5032085853,
+    1.4443135800,1.4009758071,1.3624008011,1.5433538024],
+   [,,2.5811631672,1.8280654175,1.5882766276,1.5474083347,1.4478188622,
+    1.4163339837,1.3688628865,1.3324652326,1.3086643040,1.2905815795],
+   [,,2.7530930142,2.3842463849,1.9467304198,1.5240035523,1.6733398950,
+    1.4010443494,1.4209915185,1.3169691431,1.2883159586,1.2650028341,
+    1.3765458610],
+   [,,2.4271883432,1.8005338781,1.5711923902,1.4874513465,1.4103829453,
+    1.3671470435,1.3134490612,1.2863895144,1.2634960649,1.2428145705,
+    1.2234560090,1.2135941609],
+   [,,2.3931086658,1.8078526855,1.5656579744,1.4533081054,1.3977617362,
+    1.4170040941,1.2940698154,1.2717435366,1.2475095111,1.2274713816,
+    1.2093180758,1.1979674945,1.1965543280],
+   [,,2.3265516430,1.8078427037,1.5107263356,1.5471053456,1.3993046598,
+    1.3181487705,1.2758693526,1.2716794353,1.2414391701,1.2138968069,
+    1.1981955279,1.1839434013,1.1724108313,1.1632758148],
+   [,,2.2969405947,1.7901035513,1.6241822713,1.4512856371,1.3479094740,
+    1.3013294731,1.3505233441,1.2411786676,1.2185635168,1.2013065028,
+    1.1871537716,1.1729771130,1.1609933012,1.1533971033,1.1484703008],
+   [,,2.2550182480,1.7722846629,1.5067141361,1.4343327483,1.3239256204,
+    1.2901240763,1.2563284133,1.2316861446,1.2100832476,1.1907533145,
+    1.1762334991,1.1638617556,1.1521716383,1.1442100096,1.1351988746,
+    1.1275091246],
+   [,,2.2430092781,1.9425030247,1.5138832858,1.4097424348,1.4476880954,
+    1.2808116232,1.2432677706,1.2357397691,1.1973278194,1.1811716336,
+    1.1845402727,1.1552917179,1.1442139983,1.1359332930,1.1287002524,
+    1.1206174440,1.1215046909],
+   [,,2.2084922741,1.7640787075,1.4766259010,1.3907420431,1.3124324301,
+    1.2852960376,1.2302790636,1.2152931984,1.1909610704,1.1724498003,
+    1.1597108576,1.1502103712,1.1378147035,1.1291389089,1.1211220515,
+    1.1150827178,1.1085737827,1.1042461410],
+   [,,2.2011608879,1.7696141774,1.5564558430,1.4203538704,1.3192328270,
+    1.2805497477,1.3031180022,1.2077949699,1.1983676640,1.1640245212,
+    1.1696351419,1.1437885854,1.1348125933,1.1233476110,1.1167097050,
+    1.1097025662,1.1039143943,1.0981958196,1.1005805699],
+   [,,2.1720327428,1.7704010190,1.4752980679,1.3922348306,1.3076010456,
+    1.2811431442,1.2110008317,1.2047266981,1.1691352721,1.1568384192,
+    1.1467749835,1.1368109558,1.1280172194,1.1187903372,1.1109224192,
+    1.1045137775,1.1000757923,1.0939877403,1.0894649056,1.0860163669],
+   [,,2.1563230911,1.7631141991,1.4821367182,1.3875532343,1.2904084114,
+    1.2423288293,1.1999098635,1.1907110189,1.1640104125,1.1618424456,
+    1.1396210080,1.1303837878,1.1224870997,1.1122521975,1.1065748920,
+    1.1001985870,1.0947116191,1.0897394802,1.0858313451,1.0817170079,
+    1.0781615453],
+   [,,2.1440216134,1.7540173599,1.4617078504,1.3684379797,1.2736710191,
+    1.2390221191,1.2056971064,1.1795557463,1.1608380745,1.1436258414,
+    1.1355735380,1.1249863819,1.1174572981,1.1090553285,1.1014295126,
+    1.0959003849,1.0907499410,1.0862151158,1.0819120424,1.0781826278,
+    1.0753033036,1.0720108061],
+   [,,2.1428084565,1.8557265563,1.5151944308,1.3567085750,1.3707366366,
+    1.2318065239,1.2478225672,1.1892178395,1.1610846578,1.1376796713,
+    1.1683096798,1.1201028098,1.1124418894,1.1078520750,1.1029464303,
+    1.0954850517,1.0911022778,1.0825783743,1.0827570361,1.0752759460,
+    1.0718182271,1.0689124601,1.0714042647],
+   [,,2.1226424173,1.7507956034,1.4571414635,1.3687192883,1.2685954443,
+    1.2346113236,1.1965722532,1.1667151508,1.1622852068,1.1322329353,
+    1.1236082168,1.1180356279,1.1083269208,1.1040267705,1.0971081559,
+    1.0881760988,1.0848948368,1.0797029916,1.0762450378,1.0721955568,
+    1.0690911266,1.0661148543,1.0635689719,1.0613212070],
+ ];
+
+ function update_rot_label(){
+   if (dofull){
+      updateValue('labelcontainer2', 'Full Compound Symmetry Group');
+      updateValue('mi6', 'Simulate single generator');
+   }
+   else{
+      updateValue('labelcontainer2', "generator = a'b");
+      updateValue('mi6', 'Simulate compound symmetry');
+   }
+
+ }
+
+ function toggle_user_guide(){
+   var ug = document.getElementById('userguide');
+
+   if (ug.style.display == 'none'){
+      ug.style.display = 'block';
+      updateValue('mi7', "Hide user guide");
+   } else {
+      ug.style.display = 'none';
+      updateValue('mi7', "Show user guide");
+   }
+ }
+
+ function set_r_slider(){
+   var tr1 = parseFloat(document.getElementById('range1').value);
+   var tr2 = parseFloat(document.getElementById('range3').value);
+   var tr = (tr1+tr2)/2;
+   document.getElementById('range6').value = tr;
+ }
+
+</script>
+    <style>
+
+      html, body {
+         position: fixed;
+         overflow: hidden;
+         overscroll-behavior: none;
+         -webkit-overflow-scrolling: touch;
+         touch-action: none;
+         background-color: rgb(255,255,255);
+      }
+
+
+      #kebab {
+        position: fixed;
+        bottom: 0.5vw;
+        right: 0.5vw;
+        width: 4.5vw;
+        height: 4.5vw;
+        background-color: #000000;
+        border: 2px solid #4e4e4e;
+        border-radius: 17%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: opacity 0.3s;
+        opacity: 1;
+
+      }
+      #kebab span {
+        display: block;
+        width: 6px;
+        height: 6px;
+        background-color: #fff;
+        margin: 3px;
+        border-radius: 3px;
+      }
+
+      #menu {
+        position: fixed;
+        bottom: 6.5vw;
+        right: 0.8vw;
+        width: 16.5vw;
+        background-color: #000000;
+        border: 2px solid #4e4e4e;
+        color: #fff;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        display: none;
+        z-index: 999;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      #menu ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        /* transition: opacity 0.3s; */
+      }
+      #menu li {
+        padding: 10px;
+        font: 1.1vw sans-serif;
+      }
+      #menu li:hover {
+        background-color: #636363;
+        opacity: 1;
+        /* transition: opacity 0.3s; */
+      }
+
+      /* Disc controls */
+      .button {
+        width: 4.5vw;
+        height: 4.5vw;
+        background-color: #333;
+        border: none;
+        display: block;
+        margin:0.5vw;
+        border-radius: 0.5vw;
+        font: 1.5vw georgia;
+        color: white;
+        align-items: normal;
+      }
+
+      .button-container {
+        box-sizing: content-box;
+        background-color: #000000;
+        border: 2px solid #4e4e4e;
+        position: fixed;
+        bottom: 0.5vw;
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: 1vw;
+        opacity: 1;
+        transition: opacity 0.3s;
+        display: flex;
+        align-items: center;
+        vertical-align: middle;
+      }
+
+      .label_container {
+        width: 18vw;
+        height: 4vw;
+        color: #fff;
+        position: fixed;
+        bottom: 0.5vw;
+        left: 0.5vw;
+        border-radius: 2.1vw;
+        opacity: 1;
+        transition: opacity 0.3s;
+        display:flex;
+        font: 1.5vw georgia;
+        justify-content: center;
+        align-items: center;
+        background-color: #000000;
+        border: 2px solid #4e4e4e;
+      }
+
+      .slide_box {
+        width: 40vw;
+        height: 3.5vw;
+        background-color: #000000;
+        border: 2px solid #4e4e4e;
+        position: absolute;
+        top: -4.2vw;
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: 1.9vw;
+        display: 'none';
+        transition: opacity 0.3s;
+      }
+      .slider {
+        position: relative;
+        top: 28%;
+        left: 50%;
+        width: 97%;
+        border-radius: 5;
+        height: 10px;
+        outline: none;
+        transform: translateX(-50%);
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        background-color: #000000;
+        height: 3vw;
+        width: 3vw;
+        border-radius: 1.6vw;
+        border: 2px solid rgb(255, 255, 255);
+        margin-top: 0px;
+      }
+
+      #canvas { position:fixed; left:0;top:0; width:100%; height:100%; z-index: -1;}
+
+      #userguide {
+        position: fixed;
+        top: 0.8vw;
+        right: 0.8vw;
+        width: 16.5vw;
+        background-color: #000000;
+        border: 2px solid #4e4e4e;
+        color: #ffffff;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        display: none;
+      }
+
+      #userguide ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      #userguide li {
+        padding-left: 10px;
+        padding-right: 10px;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        font: 0.9vw sans-serif;
+      }
+
+    </style>
+  </head>
+
+  <body>
+   <!-- <input type="color" id="color1" name="color1" value="#ff0000" oninput="recolor(false)">
+   <input type="color" id="color2" name="color2" value="#00ff00" oninput="recolor(false)">
+   <input type="color" id="color3" name="color3" value="#0000ff" oninput="recolor(false)"> -->
+   
+    <canvas id="canvas" width="80" height="80"></canvas>
+
+    <button id="kebab" class="kebab" onclick="activate_hamburger_menu(), activate_ui()">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <div id="menu">
+		<ul>
+		  <li id="mi1" onclick="activate_hamburger_menu(), activate_ui(), togglefullscreen()">Full screen</li>
+		  <li id="mi2" onclick="activate_hamburger_menu(), activate_ui(), downloadimage()">Download image</li>
+		  <li id="mi3" onclick="activate_hamburger_menu(), activate_ui(), criticalsnap()">Snap to critical radius</li>
+		  <li id="mi4" onclick="activate_hamburger_menu(), activate_ui(), recolor(false)">New color palette</li>
+        <li id="mi5" onclick="toggle_pttype(), activate_hamburger_menu(), activate_ui(), doanim()">Image boundary</li>
+		  <li id="mi6" onclick="toggle_rotype(), update_rot_label(), activate_hamburger_menu(), activate_ui(), doanim()">Simulate single generator</li>
+        <li id="mi7" onclick="toggle_user_guide()">Show user guide</li>
+		</ul>
+	  </div>
+
+     <div id="userguide" class="user_guide">
+      <ul>
+         <li><u>Keyboard controls</u></li>
+         <li>Arrow keys: pan</li>
+         <li>[ ]: zoom</li>
+         <!-- <li>c: work harder</li> -->
+         <li>0: return home</li>
+         <li> </li>
+         <li><u>Touch controls</u></li>
+         <li>One finger: pan</li>
+         <li>Pinch: zoom</li>
+         <li> </li>
+         <li><u>Buttons</u></li>
+         <li><i>n</i><sub>1, 2</sub>: change disc1, 2 symmetry</li>
+         <li><i>n</i>: change symmetry of both discs</li>
+         <li><i>r</i><sub>1, 2</sub>: change disc1, 2 size</li>
+         <li><i>r</i> : change size of both discs</li>
+
+
+      </ul>
+     </div>
+
+    <datalist id="steplist">
+      <option>2</option>
+      <option>3</option>
+      <option>4</option>
+      <option>5</option>
+      <option>6</option>
+      <option>7</option>
+      <option>8</option>
+      <option>9</option>
+      <option>10</option>
+      <option>11</option>
+      <option>12</option>
+      <option>13</option>
+      <option>14</option>
+      <option>15</option>
+      <option>16</option>
+      <option>17</option>
+      <option>18</option>
+      <option>19</option>
+      <option>20</option>
+    </datalist>
+
+    <div class="label_container" id="labelcontainer1"></div>
+    <div class="label_container" id="labelcontainer2" style="bottom: 6vw; font-size: 1.1vw;">Full Compound Symmetry Group</div>
+
+
+    <div class="button-container" id="button_container1">
+      <button class="button" id="button1" onclick="onlySlider(1)" style="color: #000000; background-color: #e3e3e3;"><i>r</i><sub>1</sub></button>
+      <div class="slide_box" id="slide_box1"  style="display: 'block';">
+        <input
+          type="range"
+          class="slider"
+          id="range1"
+          min="0.5"
+          max="3.5"
+          value="1"
+          step = "0.001"
+          oninput="activate_ui(), doanim(), set_r_slider()"
+        />
+      </div>
+
+
+      <button class="button" id="button6" onclick="onlySlider(6)" ><i>r</i><sub> </sub></button>
+      
+      <div class="slide_box" id="slide_box6">
+        <input
+          type="range"
+          class="slider"
+          id="range6"
+          min="0.5"
+          max="3.5"
+          value="1"
+          step = "0.001"
+          oninput="document.getElementById('range1').value = this.value, document.getElementById('range3').value = this.value, activate_ui(), doanim()"
+        />
+      </div>
+
+      <button class="button" id="button3" onclick="onlySlider(3)"><i>r</i><sub>2</sub></button>
+      <div class="slide_box" id="slide_box3">
+        <input
+          type="range"
+          class="slider"
+          id="range3"
+          min="0.5"
+          max="3.5"
+          value="1"
+          step = "0.001"
+          oninput="activate_ui(), doanim(), set_r_slider()"
+        />
+      </div>
+
+      <button class="button" id="button2" onclick="onlySlider(2)"><i>n</i><sub>1</sub></button>
+      <div class="slide_box" id="slide_box2">
+        <input
+          type="range"
+          min="2"
+          max="20"
+          value="5"
+          step="1"
+          id="range2"
+          class="slider"
+          oninput="activate_ui(), doanim()"
+          list="steplist"
+        />
+      </div>
+
+      <button class="button" id="button5" onclick="onlySlider(5)"><i>n</i><sub> </sub></button>
+      <div class="slide_box" id="slide_box5">
+        <input
+          type="range"
+          min="2"
+          max="20"
+          value="5"
+          step="1"
+          id="range5"
+          class="slider"
+          oninput="document.getElementById('range2').value = this.value,document.getElementById('range4').value = this.value, activate_ui(), doanim()"
+          list="steplist"
+        />
+      </div>
+
+   
+      <button class="button" id="button4" onclick="onlySlider(4)"><i>n</i><sub>2</sub></button>
+      <div class="slide_box" id="slide_box4">
+        <input
+          type="range"
+          min="2"
+          max="20"
+          value="5"
+          step="1"
+          id="range4"
+          class="slider"
+          oninput="activate_ui(), doanim()"
+          list="steplist"
+        />
+      </div>
+      <button class="button" id="button7" onclick="dorandom()">&#127922<sub> </sub></button>
+
+    </div>
+    <a href="" id="downloadlink" style="display: none;"></a>
+  </body>
+</html>
